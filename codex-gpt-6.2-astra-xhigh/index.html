@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en" data-light="night">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <meta name="theme-color" content="#101a20" />
+    <meta
+      name="description"
+      content="An overhead atlas of Charleston Harbor with live ship positions, terminal activity, tides and Ravenel Bridge clearance."
+    />
+    <title>Charleston Harbor — Soundings</title>
+    <link rel="icon" href="/soundings.svg" />
+  </head>
+  <body>
+    <header class="mast">
+      <div class="brand">
+        <img src="/soundings.svg" alt="" width="38" height="38" /><span>Soundings</span>
+      </div>
+      <div class="mast-location"><i data-icon="pin"></i> Charleston, SC</div>
+      <div class="mast-right">
+        <div class="clock"><span class="micro">LOCAL TIME</span><time id="clock">—</time></div>
+        <div class="mode" aria-label="Map lighting">
+          <button data-mode="auto">Auto</button
+          ><button data-mode="day" aria-label="Day mode" title="Day mode"><i data-icon="sun"></i></button
+          ><button data-mode="night" aria-label="Night mode" title="Night mode">
+            <i data-icon="moon"></i>
+          </button>
+        </div>
+        <button class="icon-btn expand" aria-label="Enter full screen" title="Full screen">
+          <i data-icon="expand"></i>
+        </button>
+      </div>
+    </header>
+    <main>
+      <div class="heading">
+        <div>
+          <div class="eyebrow"><span></span> SOUTH CAROLINA <b>/</b> US ATLANTIC COAST</div>
+          <h1>Charleston <em>Harbor</em></h1>
+        </div>
+        <div class="sync">
+          <span class="signal" id="signal">Connecting</span><span id="asof">Checking for vessel reports</span>
+        </div>
+      </div>
+      <div class="workspace">
+        <section class="map-shell" aria-label="Interactive overhead map of Charleston Harbor">
+          <div id="map"></div>
+          <canvas id="overlay" aria-hidden="true"></canvas>
+          <div class="map-top">
+            <button class="map-label" id="layers" aria-expanded="false">
+              <i data-icon="layers"></i> Map layers <i data-icon="down"></i>
+            </button>
+            <div class="layer-menu" id="layer-menu" hidden>
+              <label><input type="checkbox" data-layer="labels" checked /> Place labels</label
+              ><label><input type="checkbox" data-layer="channel" checked /> Shipping channel</label
+              ><label><input type="checkbox" data-layer="boats" checked /> Tugs &amp; pilot boats</label>
+            </div>
+          </div>
+          <div class="compass" title="North up" aria-label="North up">
+            <small>N</small
+            ><svg viewBox="0 0 28 30" aria-hidden="true">
+              <path d="M14 2 20 25 14 20Z" fill="#da9a6e" />
+              <path d="M14 2 8 25 14 20Z" fill="#e6e1ce" />
+            </svg>
+          </div>
+          <div class="map-tools">
+            <button id="zoom-in" aria-label="Zoom in" title="Zoom in"><i data-icon="plus"></i></button
+            ><button id="zoom-out" aria-label="Zoom out" title="Zoom out"><i data-icon="minus"></i></button
+            ><button id="home" aria-label="Fit whole harbor" title="Fit whole harbor">
+              <i data-icon="fit"></i>
+            </button>
+          </div>
+          <div class="legend">
+            <span><b class="cargo"></b>Cargo</span><span><b class="passenger"></b>Passenger</span
+            ><span><b class="workboat"></b>Workboat</span>
+          </div>
+          <div class="map-foot">
+            <span class="scale"><i></i><span></span></span
+            ><button id="credits">Imagery © Copernicus / USGS <i data-icon="info"></i></button>
+          </div>
+          <article id="detail" hidden aria-label="Vessel details"></article>
+        </section>
+        <aside>
+          <section class="conditions panel">
+            <div class="section-label">
+              <span><i data-icon="wave"></i> Harbor conditions</span><small>NOAA</small>
+            </div>
+            <div class="meters">
+              <div id="tide"></div>
+              <div id="gap"></div>
+            </div>
+          </section>
+          <section class="register panel">
+            <div class="register-heading">
+              <div class="eyebrow"><span></span> HARBOR TRAFFIC</div>
+              <h2>Vessel register</h2>
+            </div>
+            <div class="tabs">
+              <button id="ships-tab" aria-pressed="true">Vessels <span>—</span></button
+              ><button id="term-tab" aria-pressed="false">Terminals <span>4</span></button>
+            </div>
+            <div id="listing" tabindex="0" aria-label="Vessel and terminal list"></div>
+            <div class="list-foot">
+              <i data-icon="target"></i><span id="list-help">Select a vessel to locate it on the map</span>
+            </div>
+          </section>
+        </aside>
+      </div>
+      <footer>
+        <span><i data-icon="radio"></i> Open Waters AIS <b>·</b> NOAA CO-OPS</span
+        ><button id="sources">Sources &amp; map notes <i data-icon="arrow-up"></i></button>
+      </footer>
+    </main>
+    <dialog id="source-dialog">
+      <button class="dialog-close icon-btn" aria-label="Close sources"><i data-icon="close"></i></button>
+      <div class="eyebrow"><span></span> SOUNDINGS</div>
+      <h2>Sources &amp; map notes</h2>
+      <p>
+        Positions come from
+        <a href="https://openwaters.io/api/ais/" target="_blank" rel="noreferrer">Open Waters AIS</a>. The
+        register includes eligible ships heard within 30 minutes of each successful check. Reports and NOAA
+        observations refresh every 10 minutes.
+      </p>
+      <p id="ais-credits"></p>
+      <p>
+        True-color satellite imagery contains modified Copernicus Sentinel-2 data from 13 November 2026. Close
+        views use
+        <a
+          href="https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer"
+          target="_blank"
+          rel="noreferrer"
+          >USGS / USDA aerial photography</a
+        >. Night lighting is an artistic treatment. Ships visible in the photography are part of the basemap.
+        Colored markers identify AIS reports.
+      </p>
+      <p>
+        Channel outlines come from the
+        <a
+          href="https://spatial.usace.army.mil/opjarcgis/rest/services/eHydroPub/National_Channel_Framework/MapServer"
+          target="_blank"
+          rel="noreferrer"
+          >US Army Corps of Engineers</a
+        >. Terminal lists use proximity to the berth face and reported speed. Berth assignments are
+        approximate.
+      </p>
+      <p>
+        Observed water level is relative to mean lower low water. Bridge clearance is the measured air gap at
+        the Ravenel sensor.
+        <a href="https://tidesandcurrents.noaa.gov/ports/ports.html?id=ch" target="_blank" rel="noreferrer"
+          >NOAA CO-OPS</a
+        >.
+      </p>
+      <p>
+        Ships use class-based 3D models with reported dimensions. Vessel classes come from AIS, Open Waters
+        particulars, and exact IMO matches in
+        <a href="https://mrv.emsa.europa.eu/#public/emission-report" target="_blank" rel="noreferrer"
+          >EMSA THETIS-MRV</a
+        >. Where orientation or dimensions are unavailable, a position marker identifies the ship. For
+        observation only.
+      </p>
+    </dialog>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
