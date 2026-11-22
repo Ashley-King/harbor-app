@@ -18,7 +18,7 @@ export function makeWater(map) {
     const hl = Math.hypot(hx, hy, hz);
     const H = [hx / hl, hy / hl, hz / hl];
     const tint = night ? [170, 195, 235] : [255, 252, 240];
-    const gain = night ? 0.16 : 0.55;
+    const gain = night ? 0.16 : 0.38;
     const sharp = night ? 160 : 260;
     for (let y = 0; y < N; y++) {
       for (let x = 0; x < N; x++) {

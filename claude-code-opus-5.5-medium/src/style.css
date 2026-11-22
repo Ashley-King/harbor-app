@@ -62,7 +62,7 @@ h1 { margin: 0; font-size: 1.35em; font-weight: 650; letter-spacing: 0.01em; }
 .group h2 { font-size: 0.8em; font-weight: 650; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin: 14px 8px 4px; display: flex; justify-content: space-between; }
 .ship-row { display: flex; align-items: center; gap: 9px; padding: 6px 8px; border-radius: 8px; cursor: pointer; }
 .ship-row:hover, .ship-row.sel { background: rgba(127, 209, 255, 0.12); }
-.ship-row .sw { width: 9px; height: 22px; border-radius: 3px 3px 5px 5px; flex: none; }
+.ship-row .sw { width: 9px; height: 22px; border-radius: 5px 5px 3px 3px; flex: none; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.35); }
 .ship-row .nm { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 560; }
 .ship-row .mt { color: var(--muted); font-size: 0.82em; white-space: nowrap; }
 .empty { color: var(--muted); font-size: 0.85em; padding: 3px 8px; }
