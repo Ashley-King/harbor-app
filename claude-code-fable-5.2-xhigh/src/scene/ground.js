@@ -7,11 +7,6 @@ import { makeWaveTexture } from './noise.js';
 const TILE_URL = (z, x, y) => `https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/${z}/${y}/${x}`;
 const BASE_Z = 14; // the mosaic shipped with the app
 const MAX_Z = 16; // deepest level the USGS cache holds here
-// Sharp close-up tiles shipped with the app for the port areas: the same 2021 NAIP
-// photos at their full 0.6 m resolution (see tools/build_hires.py).
-const HIRES_Z = 17;
-const HIRES_URL = (x, y) => `/hires/${HIRES_Z}/${x}_${y}.webp`;
-const HIRES_BELOW = 1.3; // load them once a screen pixel covers less than this many metres
 const MAX_TILES = 300;
 const MAX_LOADS = 8;
 
@@ -156,14 +151,9 @@ function setupColorTexture(tex, renderer) {
   return tex;
 }
 
-/**
- * Ground imagery: the shipped mosaic, sharper USGS tiles streamed in as you zoom,
- * and the app's own sharp close-up tiles around the port.
- */
+/** Ground imagery: the shipped mosaic plus sharper tiles streamed in as you zoom. */
 export class Ground {
-  constructor(stage, env, assets, geo, hires = null) {
-    this.hires = new Set();
-    for (const [y, xs] of Object.entries((hires && hires.rows) || {})) for (const x of xs) this.hires.add(`${x}/${y}`);
+  constructor(stage, env, assets, geo) {
     this.stage = stage;
     this.env = env;
     this.bounds = geo.base;
@@ -252,21 +242,6 @@ export class Ground {
           }
         }
       }
-      if (this.hires.size && px < HIRES_BELOW) {
-        const a = worldToTile(rect.west, rect.north, HIRES_Z);
-        const c = worldToTile(rect.east, rect.south, HIRES_Z);
-        const x0 = Math.floor(a.tx), x1 = Math.floor(c.tx), y0 = Math.floor(a.ty), y1 = Math.floor(c.ty);
-        if ((x1 - x0 + 1) * (y1 - y0 + 1) <= 400) {
-          for (let y = y0; y <= y1; y++) {
-            for (let x = x0; x <= x1; x++) {
-              if (!this.hires.has(`${x}/${y}`)) continue;
-              const key = `${HIRES_Z}/${x}/${y}`;
-              wanted.add(key);
-              if (!this.tiles.has(key)) want.push({ key, z: HIRES_Z, x, y, local: true });
-            }
-          }
-        }
-      }
     }
     for (const [key, t] of this.tiles) {
       const on = wanted.has(key);
@@ -301,8 +276,7 @@ export class Ground {
       const job = this.queue.shift();
       const known = this.tiles.get(job.key);
       if (known) continue;
-      // A sharp tile replaces a softer copy of the same photo, so it needs no fade.
-      const rec = { pending: true, seen: performance.now(), fade: job.local ? 1 : 0, mesh: null };
+      const rec = { pending: true, seen: performance.now(), fade: 0, mesh: null };
       this.tiles.set(job.key, rec);
       this.loading++;
       const img = new Image();
@@ -318,7 +292,7 @@ export class Ground {
           const tex = setupColorTexture(new THREE.Texture(img), this.stage.renderer);
           tex.needsUpdate = true;
           const tb = tileBounds(job.z, job.x, job.y);
-          const mesh = this._mesh(tex, rec.fade);
+          const mesh = this._mesh(tex, 0);
           mesh.position.set(tb.west, 0, -tb.north);
           mesh.scale.set(tb.size, 1, tb.size);
           mesh.renderOrder = -100 + (job.z - BASE_Z);
@@ -334,7 +308,7 @@ export class Ground {
         setTimeout(() => this.tiles.get(job.key) === rec && !rec.mesh && this.tiles.delete(job.key), 60000);
         done();
       };
-      img.src = job.local ? HIRES_URL(job.x, job.y) : TILE_URL(job.z, job.x, job.y);
+      img.src = TILE_URL(job.z, job.x, job.y);
     }
   }
 }
