@@ -22,6 +22,8 @@ This runs the feed-recovery / normalization tests and the production build. `npm
 
 ## Vercel
 
+Live app: [harbor-codex-gpt-6-high.vercel.app](https://harbor-codex-gpt-6-high.vercel.app)
+
 | Setting | Value |
 | --- | --- |
 | Project | `harbor-codex-gpt-6-high` |
@@ -31,7 +33,7 @@ This runs the feed-recovery / normalization tests and the production build. `npm
 | Build | `npm run build` |
 | Output | `dist` |
 
-The project is independent of the other implementations in the shared repository. It has no application secrets and needs no Vercel environment variables. A Vercel deployment access token is an operator credential only; never add it to the app or its environment variables. Deploy the committed Git revision with the project root above.
+The project is independent of the other implementations in the shared repository. It has no application secrets and needs no Vercel environment variables. A Vercel deployment access token is an operator credential only; never add it to the app or its environment variables. Production is deployed directly from this folder’s committed files through the Vercel deployment API, with the project root above. The account does not have the GitHub integration installed, so a Git push alone does not publish a new version. The upload includes only this implementation’s tracked files, with no other model folders or repository-root files.
 
 ## Live observations
 
