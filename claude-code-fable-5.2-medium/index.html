@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <title>Charleston Harbor Live Ships</title>
+  <meta name="description" content="Live overhead view of large ships in Charleston Harbor, South Carolina." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230b1622'/%3E%3Cpath d='M16 4c4 4 5 8 5 12v10h-10V16c0-4 1-8 5-12z' fill='%23e9eef2'/%3E%3Ccircle cx='11' cy='15' r='2' fill='%23ff3b30'/%3E%3Ccircle cx='21' cy='15' r='2' fill='%2334e07a'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <canvas id="scene" aria-label="Overhead view of Charleston Harbor with live ship positions"></canvas>
+  <div id="labels" aria-hidden="true"></div>
+
+  <header id="top" class="glass">
+    <div>
+      <h1>Charleston Harbor</h1>
+      <p id="clock">Loading</p>
+    </div>
+    <div id="modes" role="group" aria-label="Lighting mode">
+      <button data-mode="auto" title="Follow Charleston's real sunrise and sunset">Auto</button>
+      <button data-mode="day">Day</button>
+      <button data-mode="night">Night</button>
+    </div>
+    <p id="sunline"></p>
+  </header>
+
+  <aside id="panel" class="glass">
+    <section id="status"></section>
+    <section id="conditions"></section>
+    <section id="terminals"></section>
+    <section id="legend">
+      <h2>Lights at night</h2>
+      <p><i class="dot red"></i>port <i class="dot green"></i>starboard <i class="dot white"></i>masthead and stern, shown on vessels under way. Moored and anchored vessels show white anchor lights and deck lights, as the rules require.</p>
+      <p class="muted">Ship models are drawn to each vessel's AIS length, beam and heading. Deck cargo and colours are illustrative.</p>
+    </section>
+  </aside>
+
+  <div id="card" class="glass" hidden></div>
+  <button id="home" class="glass" title="Show the whole harbor">Whole harbor</button>
+  <button id="panelToggle" class="glass" title="Show or hide the side panel">Panel</button>
+  <footer id="credits"></footer>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
