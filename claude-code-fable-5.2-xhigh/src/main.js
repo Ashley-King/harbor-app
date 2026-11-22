@@ -65,9 +65,10 @@ async function boot() {
   const probe = document.createElement('canvas').getContext('webgl2');
   if (!probe) throw new Error('This browser cannot draw the 3D map (WebGL 2 is not available).');
 
-  const [geo, harbor, bin, base, mask, tint] = await Promise.all([
+  const [geo, harbor, hires, bin, base, mask, tint] = await Promise.all([
     loadJson('/data/geo.json'),
     loadJson('/data/harbor.json'),
+    loadJson('/data/hires.json').catch(() => null), // sharp close-up tiles are optional
     fetch('/data/lights.bin').then((r) => {
       if (!r.ok) throw new Error('could not load the light positions');
       return r.arrayBuffer();
@@ -79,7 +80,7 @@ async function boot() {
 
   const stage = new Stage(canvas, geo.base);
   const env = new Env(stage);
-  const ground = new Ground(stage, env, { base, mask, tint }, geo);
+  const ground = new Ground(stage, env, { base, mask, tint }, geo, hires);
   const noise = ground.shared.uNoise.value;
 
   // Fixed lights, and the light map the ground and water use at night.

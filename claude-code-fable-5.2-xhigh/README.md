@@ -67,6 +67,7 @@ For each ship that is under way, the function also fetches the track it actually
 All free, no keys. Credits also appear on screen.
 
 - Aerial imagery: USGS The National Map, USDA NAIP orthophotos (public domain). A zoom 14 mosaic ships with the app. Sharper tiles to zoom 16 load from the USGS tile cache as you zoom.
+- Close-up imagery: the USGS cache stops at about 2 m per pixel, so the app ships its own 0.5 m tiles for the terminals, the banks of the shipping channel, Patriots Point, Fort Sumter, Castle Pinckney and the Coast Guard base. They are the same 2021 NAIP photos at full resolution, read from the public NAIP archive on Microsoft's Planetary Computer (no key) and colour-matched to the USGS tiles. They load from this app's own domain, so nothing slow is in the way.
 - Roads, terminals, piers, cranes, bridges, buoys, water outlines: OpenStreetMap contributors (ODbL), via the Overpass API.
 - Shipping channel outline and reach names: US Army Corps of Engineers, National Channel Framework (public domain).
 - Sun and moon positions: computed in the browser.
@@ -77,7 +78,7 @@ The files under `public/data` are built from those sources by the scripts in `to
 
 - AIS gives a broad type only. Tankers, passenger vessels, tugs and pilot boats are drawn from the AIS type. For cargo ships the model (container ship, car carrier, bulk carrier, general cargo) is an estimate from the name, the berth and the size, and the card says which.
 - Paint schemes, container loads and deck details are generic for each kind of ship. AIS does not describe them.
-- The deepest imagery is about 2 m per pixel, so the land is soft at the closest zoom.
+- Close-up imagery is 0.5 m per pixel around the port (see above). Away from the terminals and the channel the deepest imagery is about 2 m per pixel, so that land is soft at the closest zoom.
 - Some transponders report no heading. A stationary ship with no heading is drawn lying along its wharf, or the way its hull fits the open water around it, and the card says so. Bow and stern may be swapped in that case.
 - A berthed hull that GPS error would place partly inside the wharf is moved straight off the wharf face until it clears, by at most 30 m.
 - Not for navigation.
@@ -93,12 +94,13 @@ src/ships/           the 3D vessel models
 src/ui/              side panel, ship card, map labels
 src/astro.js         sun and moon
 public/data/         imagery mosaic, water mask, lights, harbor features
-tools/               scripts that build public/data
+public/hires/        sharp close-up imagery tiles for the port areas
+tools/               scripts that build public/data and public/hires
 ```
 
 ## Rebuilding the map data
 
-Only needed to refresh the imagery or the OpenStreetMap features. Needs Python 3 with Pillow, NumPy and SciPy.
+Only needed to refresh the imagery or the OpenStreetMap features. Needs Python 3 with Pillow, NumPy and SciPy. The close-up tiles also need rasterio.
 
 ```bash
 python3 tools/fetch_imagery.py 14
@@ -122,6 +124,10 @@ python3 tools/build_features.py
 
 ```bash
 python3 tools/build_lights.py
+```
+
+```bash
+python3 tools/build_hires.py
 ```
 
 ## Deploy
