@@ -4,7 +4,7 @@ An overhead, photorealistic view of the large ships in Charleston Harbor, South 
 
 - Folder: `claude-code-fable-5.2-medium`
 - Vercel project: `harbor-claude-code-fable-5.2-medium`
-- Live URL: see the "Deployment" section below
+- Live URL: https://harbor-claude-code-fable-52-medium.vercel.app
 
 ## What it shows
 
@@ -48,7 +48,9 @@ builds the static site into `dist/`.
 
 ## Deployment
 
-Deployed to Vercel as its own project with this folder as the root directory. Vercel builds the Vite site and serves `api/harbor.js` as a serverless function. There are no environment variables.
+Live at https://harbor-claude-code-fable-52-medium.vercel.app (Vercel drops the dot from the project name in the address).
+
+Deployed to Vercel as its own project, `harbor-claude-code-fable-5.2-medium`, with this folder as the root directory. Vercel builds the Vite site and serves `api/harbor.js` as a serverless function. There are no environment variables. The project is not connected to GitHub, so it is deployed with the Vercel CLI from a clean copy of the committed folder.
 
 ## How it is built
 
