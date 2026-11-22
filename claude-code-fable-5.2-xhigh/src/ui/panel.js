@@ -116,7 +116,8 @@ export class Panel {
       <path d="M78 3L30 ${top}M78 3L52 ${top}M78 3L104 ${top}M78 3L120 ${top}M162 3L120 ${top}M162 3L136 ${top}M162 3L188 ${top}M162 3L210 ${top}" stroke="var(--muted)" stroke-width="0.8" fill="none" vector-effect="non-scaling-stroke"/>
       <path d="M0 ${y}q7.5 -3 15 0t15 0 15 0 15 0 15 0 15 0 15 0 15 0 15 0 15 0 15 0 15 0 15 0 15 0 15 0 15 0" fill="none" stroke="var(--water-label)" stroke-width="1.4" vector-effect="non-scaling-stroke"/>
       <path d="M120 ${top + 3}V${y - 4}M116 ${top + 8}l4 -5 4 5M116 ${y - 9}l4 5 4 -5" fill="none" stroke="var(--accent)" stroke-width="1.6" vector-effect="non-scaling-stroke"/>
-      <text x="128" y="${(top + y) / 2 + 3}" font-size="9" fill="var(--muted)">charted ${CHARTED_CLEARANCE_FT} ft at high water</text>`;
+      <text x="170" y="${(top + y) / 2 - 2}" font-size="8.5" fill="var(--muted)">charted ${CHARTED_CLEARANCE_FT} ft</text>
+      <text x="170" y="${(top + y) / 2 + 8}" font-size="8.5" fill="var(--muted)">at high water</text>`;
   }
 
   // ------------------------------------------------------------ ships
@@ -186,9 +187,10 @@ export class Panel {
     const el = $('status');
     const ais = feed.state.ais;
     const lines = [];
-    if (ais.stale) {
-      const last = ais.at ? `Last good data ${clockSmart(ais.at, now)}.` : 'No good data yet.';
-      lines.push(`<p class="is-stale"><span class="dot"></span><span>Ship positions are stale. ${esc(last)} Trying again at ${esc(clock(feed.nextAt))}.</span></p>`);
+    if (ais.stale && !ais.at) {
+      lines.push(`<p class="is-stale"><span class="dot"></span><span>The ship feed has not answered, so no ships are drawn. Trying again at ${esc(clock(feed.nextAt))}.</span></p>`);
+    } else if (ais.stale) {
+      lines.push(`<p class="is-stale"><span class="dot"></span><span>Ship positions are stale. Last good data ${esc(clockSmart(ais.at, now))}. Trying again at ${esc(clock(feed.nextAt))}.</span></p>`);
     } else if (ais.at) {
       lines.push(`<p><span class="dot"></span><span>Ships updated ${esc(clockSec(ais.at))} ${esc(zoneName(ais.at))}</span></p>`);
     } else {
@@ -197,7 +199,8 @@ export class Panel {
     const noaaStale = feed.state.tide.stale || feed.state.airGap.stale;
     if (noaaStale) {
       const which = feed.state.tide.stale && feed.state.airGap.stale ? 'Tide and clearance are' : feed.state.tide.stale ? 'Tide is' : 'Bridge clearance is';
-      lines.push(`<p class="is-stale"><span class="dot"></span><span>${which} stale. Trying again at ${esc(clock(feed.nextAt))}.</span></p>`);
+      const none = !feed.state.tide.at && !feed.state.airGap.at;
+      lines.push(`<p class="is-stale"><span class="dot"></span><span>${none ? 'NOAA has not answered' : `${which} stale`}. Trying again at ${esc(clock(feed.nextAt))}.</span></p>`);
     } else if (feed.state.tide.at) {
       lines.push(`<p><span class="dot"></span><span>Tide and clearance updated ${esc(clock(feed.state.tide.at))}</span></p>`);
     }

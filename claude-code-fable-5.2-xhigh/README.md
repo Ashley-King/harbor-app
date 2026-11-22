@@ -5,7 +5,7 @@ An overhead view of the large ships in Charleston Harbor, South Carolina, drawn 
 - Built by: Claude Code, model Fable 5.2, effort xhigh
 - Folder: `claude-code-fable-5.2-xhigh`
 - Vercel project: `harbor-claude-code-fable-5.2-xhigh`
-- Live URL: LIVE_URL_PLACEHOLDER
+- Live URL: https://harbor-claude-code-fable-52-xhigh.vercel.app
 
 ## What you see
 
@@ -78,7 +78,7 @@ The files under `public/data` are built from those sources by the scripts in `to
 - AIS gives a broad type only. Tankers, passenger vessels, tugs and pilot boats are drawn from the AIS type. For cargo ships the model (container ship, car carrier, bulk carrier, general cargo) is an estimate from the name, the berth and the size, and the card says which.
 - Paint schemes, container loads and deck details are generic for each kind of ship. AIS does not describe them.
 - The deepest imagery is about 2 m per pixel, so the land is soft at the closest zoom.
-- Some transponders report no heading. A berthed ship with no heading is drawn lying along its wharf, and the card says so.
+- Some transponders report no heading. A stationary ship with no heading is drawn lying along its wharf, or the way its hull fits the open water around it, and the card says so. Bow and stern may be swapped in that case.
 - A berthed hull that GPS error would place partly inside the wharf is moved straight off the wharf face until it clears, by at most 30 m.
 - Not for navigation.
 

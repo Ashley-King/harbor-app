@@ -168,8 +168,9 @@ export class Stage {
     const b = this.bounds;
     const hw = (h * this.width) / this.height / 2;
     const hh = h / 2;
+    const m = 280; // the imagery fades out over its last 260 m
     const fit = (v, lo, hi, half) => (hi - lo <= half * 2 ? (lo + hi) / 2 : clamp(v, lo + half, hi - half));
-    return [fit(x, b.west, b.east, hw), fit(y, b.south, b.north, hh)];
+    return [fit(x, b.west + m, b.east - m, hw), fit(y, b.south + m, b.north - m, hh)];
   }
 
   _clampTarget() {

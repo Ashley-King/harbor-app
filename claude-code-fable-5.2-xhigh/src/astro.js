@@ -82,9 +82,11 @@ export function sunTimes(ms, where = CHARLESTON) {
   return { sunrise: fromJulian(noon - (set - noon)), sunset: fromJulian(set), noon: fromJulian(noon) };
 }
 
-/** True between sunset and sunrise. Also returns the next switch time. */
+/**
+ * Night or day in Charleston, and when it next changes. It is night exactly when
+ * the next event is a sunrise, so the view and its caption can never disagree.
+ */
 export function dayState(ms, where = CHARLESTON) {
-  const isNight = sunPosition(ms, where).altitude < -0.833 * rad;
   let next = null;
   for (const offset of [-1, 0, 1, 2]) {
     const t = sunTimes(ms + offset * DAY, where);
@@ -92,5 +94,6 @@ export function dayState(ms, where = CHARLESTON) {
       if (at > ms && (!next || at < next.at)) next = { kind, at };
     }
   }
+  const isNight = next ? next.kind === 'sunrise' : sunPosition(ms, where).altitude < -0.833 * rad;
   return { isNight, next };
 }

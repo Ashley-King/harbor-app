@@ -32,7 +32,7 @@ async function loadJson(url) {
   return res.json();
 }
 
-/** Water coverage (0..1) at a world position, read from the mask on the CPU. */
+/** Open-water coverage (0..1) at a world position, read from the mask on the CPU. */
 function waterSampler(image, b) {
   const w = Math.round(image.width / 2), h = Math.round(image.height / 2);
   const c = document.createElement('canvas');
@@ -41,12 +41,13 @@ function waterSampler(image, b) {
   const ctx = c.getContext('2d', { willReadFrequently: true });
   ctx.drawImage(image, 0, 0, w, h);
   const px = ctx.getImageData(0, 0, w, h).data;
-  const red = new Uint8Array(w * h);
-  for (let i = 0; i < red.length; i++) red[i] = px[i * 4];
+  // Open water only: piers, bridges and jetties (green channel) count as obstacles.
+  const open = new Uint8Array(w * h);
+  for (let i = 0; i < open.length; i++) open[i] = Math.round((px[i * 4] * (255 - px[i * 4 + 1])) / 255);
   return (x, y) => {
     const u = Math.floor(((x - b.west) / (b.east - b.west)) * w);
     const v = Math.floor(((b.north - y) / (b.north - b.south)) * h);
-    return u < 0 || v < 0 || u >= w || v >= h ? 0 : red[v * w + u] / 255;
+    return u < 0 || v < 0 || u >= w || v >= h ? 0 : open[v * w + u] / 255;
   };
 }
 

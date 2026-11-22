@@ -113,7 +113,7 @@ void main() {
     vec2 wob = slope * 0.004;
     vec3 refl = texture2D(uLightMap, g + wob).rgb * 0.55 + texture2D(uLightMap, g - wob * 2.3).rgb * 0.45;
     refl = 1.0 - exp(-refl * 1.6);
-    float glint = 0.16 + 0.95 * smoothstep(0.34, 0.9, n2.b * 0.5 + n3.b * 0.5) + 0.5 * smoothstep(0.55, 0.95, n3.b * 0.4 + n4.b * 0.6);
+    float glint = 0.10 + 0.8 * smoothstep(0.40, 0.92, n2.b * 0.5 + n3.b * 0.5) + 0.55 * smoothstep(0.55, 0.95, n3.b * 0.4 + n4.b * 0.6);
     vec3 Hm = normalize(uMoonDir + V);
     float moonGlint = pow(max(dot(N, Hm), 0.0), 260.0) * 2.4 + pow(max(dot(N, Hm), 0.0), 30.0) * 0.05;
     vec3 waterNight = tint * vec3(0.20, 0.34, 0.62) * uMoonAmbient * patches
@@ -124,7 +124,7 @@ void main() {
   }
 
   // Fade out to the backdrop at the edge of the imagery.
-  vec2 e = min(g, 1.0 - g) / (uBounds.zw * 900.0);
+  vec2 e = min(g, 1.0 - g) / (uBounds.zw * 260.0);
   float edge = smoothstep(0.0, 1.0, min(e.x, e.y));
   col = mix(uBackdrop, col, edge);
 

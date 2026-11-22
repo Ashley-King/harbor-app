@@ -313,6 +313,7 @@ details.group > summary h2 { justify-content: flex-start; }
 
 .card {
   position: absolute;
+  z-index: 3;
   top: 0.9rem;
   left: 0.9rem;
   width: min(22.5rem, calc(100% - 1.8rem));
