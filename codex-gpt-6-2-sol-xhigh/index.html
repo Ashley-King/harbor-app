@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en" data-theme="night">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#0b1318" />
+    <meta name="description" content="Live AIS vessel positions, tides and bridge clearance for Charleston Harbor, South Carolina." />
+    <title>Charleston Harbor Watch</title>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="Charleston Harbor Watch home">
+        <span class="brand-mark" data-icon="radar"></span>
+        <span><span class="brand-title">Charleston Harbor Watch</span><span class="brand-region">SOUTH CAROLINA · USA</span></span>
+      </a>
+      <div class="top-actions">
+        <div class="local-clock"><span>CHARLESTON TIME</span><time id="clock">—</time></div>
+        <div class="theme-control" aria-label="Map appearance" role="group">
+          <button type="button" data-mode="auto" title="Follow local sunrise and sunset" aria-pressed="true">Auto</button>
+          <button type="button" data-mode="day" title="Day mode" aria-label="Day mode" aria-pressed="false" data-icon="sun"></button>
+          <button type="button" data-mode="night" title="Night mode" aria-label="Night mode" aria-pressed="false" data-icon="moon"></button>
+        </div>
+      </div>
+    </header>
+    <main>
+      <section class="map-shell" aria-label="Charleston Harbor aerial map">
+        <div id="map" tabindex="0" aria-label="Interactive harbor map. Use arrow keys to pan and plus or minus to zoom."></div>
+        <div class="map-top">
+          <div class="map-badge"><span class="live-dot" id="map-dot"></span><span id="map-feed" role="status">Connecting to AIS</span></div>
+          <button class="panel-toggle map-badge" type="button" data-icon="panel" aria-label="Show harbor activity" aria-controls="harbor-panel" aria-expanded="true"></button>
+        </div>
+        <div class="map-tools" aria-label="Map controls">
+          <button type="button" id="home-view" title="Fit the harbor" aria-label="Fit the harbor" data-icon="locate"></button>
+          <div class="tool-group">
+            <button type="button" id="zoom-in" aria-label="Zoom in" data-icon="plus"></button>
+            <button type="button" id="zoom-out" aria-label="Zoom out" data-icon="minus"></button>
+          </div>
+          <button type="button" id="fullscreen" title="Fullscreen map" aria-label="Toggle fullscreen map" data-icon="expand"></button>
+        </div>
+        <div class="map-key" aria-label="Map legend">
+          <span><i class="legend-vessel"></i> Vessel</span><span><i class="legend-tug"></i> Tug / pilot</span><span><i class="legend-channel"></i> Channel</span>
+        </div>
+        <div class="map-attribution" id="attribution">
+          <a href="https://www.rfa.sc.gov/resources/mapping/statewide-aerial-imagery" target="_blank" rel="noreferrer">SC RFA aerial</a> ·
+          <a href="https://www.esri.com/en-us/legal/terms/data-attributions" target="_blank" rel="noreferrer">Esri, Maxar, Earthstar Geographics &amp; GIS community</a> ·
+          <a href="https://openwaters.io/ais/" target="_blank" rel="noreferrer">Open Waters AIS</a><span id="source-partners"></span>
+        </div>
+        <article id="ship-card" class="ship-card" hidden aria-label="Selected vessel" aria-live="polite"></article>
+      </section>
+      <aside id="harbor-panel" aria-label="Harbor activity">
+        <div class="panel-heading">
+          <div><p class="eyebrow">PORT OF CHARLESTON</p><h1>Harbor activity</h1></div>
+          <button type="button" class="inline-icon panel-close" aria-label="Hide harbor activity" data-icon="close"></button>
+          <button type="button" id="refresh" class="inline-icon" title="Refresh now" aria-label="Refresh live observations" data-icon="refresh"></button>
+        </div>
+        <div class="fleet-stats">
+          <div><strong id="vessel-count">—</strong><span>LARGE VESSELS</span></div>
+          <div><strong id="moving-count">—</strong><span>UNDER WAY</span></div>
+          <div><strong id="service-count">—</strong><span>TUGS / PILOTS</span></div>
+        </div>
+        <section class="conditions" aria-labelledby="conditions-title">
+          <div class="section-heading"><h2 id="conditions-title">Water &amp; clearance</h2><a href="https://tidesandcurrents.noaa.gov/" target="_blank" rel="noreferrer">NOAA</a></div>
+          <div class="condition-grid">
+            <article class="condition" id="tide"><span class="condition-icon" data-icon="waves"></span><h3>Charleston tide</h3><p class="reading">—</p><span class="condition-sub">FT ABOVE MLLW</span><time></time></article>
+            <article class="condition" id="clearance"><span class="condition-icon" data-icon="bridge"></span><h3>Ravenel clearance</h3><p class="reading">—</p><span class="condition-sub">FT AIR GAP</span><time></time></article>
+          </div>
+        </section>
+        <section class="terminals" aria-labelledby="terminal-title">
+          <div class="section-heading"><h2 id="terminal-title">Terminals</h2><span>AIS BERTH AREA</span></div>
+          <div id="terminal-list"></div>
+        </section>
+        <div class="fleet-list">
+          <details id="fleet"><summary><span>Vessel directory</span><span id="directory-count"></span></summary><div id="directory"></div></details>
+        </div>
+      </aside>
+    </main>
+    <footer class="statusbar">
+      <span><i class="live-dot" id="footer-dot"></i><span id="last-updated">Waiting for live reports</span></span>
+      <span id="sun-times"></span>
+      <span>REFRESHES EVERY 10 MIN</span>
+    </footer>
+    <script type="module" src="/src/app.js"></script>
+  </body>
+</html>
