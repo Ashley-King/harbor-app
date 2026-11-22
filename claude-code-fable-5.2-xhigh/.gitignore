@@ -1,0 +1,10 @@
+# secrets and local config
+.env*
+.vercel
+# dependencies and build output
+node_modules
+dist
+# tool scratch (raw downloads used to build public/data)
+tools/.cache
+.DS_Store
+*.log
