@@ -2,6 +2,8 @@
 
 An overhead ship atlas for Charleston, South Carolina. The view spans the entrance jetties, the Cooper and Wando rivers, four SC Ports terminals, and the Ravenel and Don Holt bridges.
 
+[Open the live atlas](https://harbor-codex-gpt-62-astra-xhigh.vercel.app/)
+
 ## Run locally
 
 Use Node.js 22 and run these commands from this folder.

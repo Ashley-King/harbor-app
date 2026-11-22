@@ -31,10 +31,12 @@ export function createMap(onShip, onTerminal) {
     markerZoomAnimation: false,
     preferCanvas: true
   })
+  map.createPane('satellite').style.zIndex = '190'
   const base = L.imageOverlay('/imagery/charleston-night.webp', geoBounds, {
+    pane: 'satellite',
     className: 'satellite-base'
   }).addTo(map)
-  const aerial = L.tileLayer('/api/imagery?z={z}&x={x}&y={y}', {
+  L.tileLayer('/api/imagery?z={z}&x={x}&y={y}', {
     minZoom: 14,
     maxNativeZoom: 17,
     maxZoom: 18,
@@ -471,7 +473,6 @@ export function createMap(onShip, onTerminal) {
       if (night !== value) {
         night = value
         base.setUrl('/imagery/charleston' + (night ? '-night' : '') + '.webp')
-        aerial.redraw()
         request()
       }
     }

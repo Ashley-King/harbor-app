@@ -1,7 +1,7 @@
 const ROOT = 'https://ais.openwaters.io/v1/vessels'
 const BOX = '32.70,-80.05,32.95,-79.75'
 const HALF_HOUR = 30 * 60_000
-const agent = 'harbor-bench/1.0 (https://harbor-codex-gpt-6-2-astra-xhigh.vercel.app)'
+const agent = 'harbor-bench/1.0 (https://harbor-codex-gpt-62-astra-xhigh.vercel.app)'
 const lastGood = new Map()
 const registry = new Map()
 let pending
