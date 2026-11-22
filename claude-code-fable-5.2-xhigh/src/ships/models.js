@@ -351,7 +351,7 @@ export function cruiseShip(L, B, rand) {
   const outline = hullOutline(L, B, { bow: 0.22, bowA: 1.6, bowB: 0.9, stern: 0.06, transom: 0.9 });
   const hullCol = big ? pick(rand, [WHITE, WHITE, 0x1a2a4c]) : WHITE;
   const teak = 0xb89462;
-  hull(b, outline, D, hullCol, teak);
+  hull(b, outline, D, hullCol, 0xd3d6d4);
   const bowX = L / 2, sternX = -L / 2;
   // stepped superstructure tiers
   const tiers = big ? 5 : L > 70 ? 3 : 2;
