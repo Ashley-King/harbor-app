@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "cf:dev": "vite build && wrangler dev",
+    "cf:dev": "vite build && wrangler dev --var LOCAL_DEV:1",
     "cf:deploy": "vite build && wrangler deploy"
   },
   "dependencies": {

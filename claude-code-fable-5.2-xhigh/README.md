@@ -182,12 +182,19 @@ npx wrangler login
 npm run cf:deploy
 ```
 
-To run it locally the way Cloudflare does, at http://localhost:8787:
+To run it locally the way Cloudflare does, at http://localhost:8787 (the script marks the run as local so it is not redirected to https):
 
 ```bash
 npm run cf:dev
 ```
 
 The site's address, `charlestonharborwatch.com` (with and without `www`), is set under `routes` in `wrangler.jsonc`. Cloudflare creates the DNS records and certificates on deploy. The domain has to be a zone on the same Cloudflare account, so anyone deploying a copy elsewhere should change or remove those two lines.
+
+How the Cloudflare deploy is locked down:
+
+- One address only. Plain http and the `www` name are redirected to `https://charlestonharborwatch.com`, and the `workers.dev` and preview addresses are switched off.
+- Security headers on every static file (`public/_headers`): a content security policy that allows only the site's own code, styles and fonts, plus USGS map tiles as images; no framing; no MIME sniffing; HSTS; a tight permissions policy.
+- The data endpoint answers GET and HEAD only, sends no cross-origin headers, and keeps each finished answer for 20 seconds in Cloudflare's cache, so however often it is called the sources are asked about once per 20 seconds per Cloudflare location.
+- Nothing secret exists to leak: no keys, tokens or environment variables.
 
 No environment variables or secrets are needed. It fits the Workers Free plan: static files are served free, and only `/api/harbor` runs the Worker. That plan allows 50 outgoing calls per request, so on Cloudflare the endpoint fetches tracks for up to 32 moving vessels where Vercel fetches 40. A warm Worker shares one finished answer for 20 seconds.

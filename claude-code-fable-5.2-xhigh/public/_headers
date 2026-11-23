@@ -1,4 +1,17 @@
-# Cloudflare: cache rules for the static files (Vercel reads its own from vercel.json).
+# Cloudflare: headers for the static files (Vercel reads its own from vercel.json).
+
+# Security headers on everything. The page loads its own code, styles and fonts only.
+# The one outside address is the USGS imagery server, for map tiles, as images.
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Strict-Transport-Security: max-age=15552000
+  Cross-Origin-Opener-Policy: same-origin
+  Permissions-Policy: accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://basemap.nationalmap.gov; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests
+
+# Cache rules.
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
 
