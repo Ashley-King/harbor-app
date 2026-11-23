@@ -17,6 +17,11 @@
     { "pattern": "charlestonharborwatch.com", "custom_domain": true },
     { "pattern": "www.charlestonharborwatch.com", "custom_domain": true }
   ],
+  // The harbor log lives in one Workers KV record. No id is given here on purpose:
+  // Wrangler creates the namespace on the first deploy and remembers it.
+  "kv_namespaces": [{ "binding": "HARBOR_LOG" }],
+  // Every ten minutes the Worker notes which ships are in the harbor, for the log.
+  "triggers": { "crons": ["*/10 * * * *"] },
   // No second public address: the site answers on its own domain only.
   "workers_dev": false,
   "preview_urls": false,

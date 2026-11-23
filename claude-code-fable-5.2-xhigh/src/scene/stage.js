@@ -80,7 +80,7 @@ export class Stage {
     let cx = (HARBOR.west + HARBOR.east) / 2;
     let cy = (HARBOR.south + HARBOR.north) / 2;
     this.maxHeight = Math.max(h * 1.2, 9000);
-    [cx, cy] = this._inside(cx, cy, h);
+    [cx, cy] = this.inside(cx, cy, h);
     if (animate) this.flyTo(cx, cy, h, 1.6);
     else {
       this.center.x = this.target.x = cx;
@@ -95,7 +95,7 @@ export class Stage {
       from: { x: this.center.x, y: this.center.y, h: this.viewHeight },
       to: (() => {
         const hh = clamp(h, this.minHeight, this.maxHeight);
-        const [tx, ty] = this._inside(x, y, hh);
+        const [tx, ty] = this.inside(x, y, hh);
         return { x: tx, y: ty, h: hh };
       })(),
       t: 0,
@@ -164,7 +164,7 @@ export class Stage {
   }
 
   /** Keep a view of height h inside the imagery where it fits, centred on it where it does not. */
-  _inside(x, y, h) {
+  inside(x, y, h) {
     const b = this.bounds;
     const hw = (h * this.width) / this.height / 2;
     const hh = h / 2;
@@ -175,7 +175,7 @@ export class Stage {
 
   _clampTarget() {
     this.target.h = clamp(this.target.h, this.minHeight, this.maxHeight);
-    [this.target.x, this.target.y] = this._inside(this.target.x, this.target.y, this.target.h);
+    [this.target.x, this.target.y] = this.inside(this.target.x, this.target.y, this.target.h);
   }
 
   render() {

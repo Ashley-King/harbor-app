@@ -6,62 +6,84 @@
     <meta name="color-scheme" content="dark light" />
     <meta name="theme-color" content="#071019" />
     <title>Charleston Harbor, live ships</title>
-    <meta name="description" content="A live overhead view of the large ships in Charleston Harbor, South Carolina, with tide and Ravenel Bridge clearance." />
+    <meta name="description" content="A live overhead view of the large ships in Charleston Harbor, South Carolina, with tide, weather, currents and Ravenel Bridge clearance." />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23071019'/%3E%3Cpath d='M6 19h20l-3 6H9z' fill='%23f0b866'/%3E%3Cpath d='M11 18v-6h4v6zm5 0V9h4v9z' fill='%23dbe6ee'/%3E%3C/svg%3E" />
   </head>
   <body>
     <div id="app">
       <aside id="board" aria-label="Harbor board">
-        <header class="board-head">
-          <h1>Charleston Harbor</h1>
-          <p id="clock" class="clock"></p>
-        </header>
+        <button type="button" id="sheet-handle" class="sheet-handle" aria-expanded="false" aria-controls="board-body">
+          <span class="grip" aria-hidden="true"></span>
+          <span class="sheet-title">Charleston Harbor</span>
+          <span class="sheet-sum" id="sheet-sum">Tide, bridge and ships</span>
+        </button>
+        <div id="board-body" class="board-body">
+          <header class="board-head">
+            <h1>Charleston Harbor</h1>
+            <p id="clock" class="clock"></p>
+          </header>
 
-        <section class="conditions" aria-label="Tide and bridge clearance">
-          <div class="reading" id="tide">
-            <h2>Tide at Charleston</h2>
-            <p class="value"><span class="num" id="tide-value">unknown</span></p>
-            <p class="detail" id="tide-detail">Waiting for NOAA</p>
-            <svg id="tide-chart" class="tide-chart" viewBox="0 0 240 64" preserveAspectRatio="none" role="img" aria-label="Tide over the last six hours and the next eighteen"></svg>
-            <p class="feed-note" id="tide-note" hidden></p>
-          </div>
-          <div class="reading" id="gap">
-            <h2>Ravenel Bridge clearance</h2>
-            <p class="value"><span class="num" id="gap-value">unknown</span></p>
-            <p class="detail" id="gap-detail">Waiting for NOAA</p>
-            <svg id="gap-chart" class="gap-chart" viewBox="0 0 240 64" role="img" aria-label="Diagram of the space between the water and the bridge deck"></svg>
-            <p class="feed-note" id="gap-note" hidden></p>
-          </div>
-        </section>
+          <section id="alerts" class="alerts" aria-label="Marine alerts and forecast" hidden></section>
 
-        <section class="ships" aria-label="Ships in the harbor">
-          <div id="ship-lists"></div>
-        </section>
+          <section class="conditions" aria-label="Tide and bridge clearance">
+            <div class="reading" id="tide">
+              <h2>Tide at Charleston</h2>
+              <p class="value"><span class="num" id="tide-value">unknown</span></p>
+              <p class="detail" id="tide-detail">Waiting for NOAA</p>
+              <svg id="tide-chart" class="tide-chart" viewBox="0 0 240 64" preserveAspectRatio="none" role="img" aria-label="Tide over the last six hours and the next eighteen"></svg>
+              <p class="feed-note" id="tide-note" hidden></p>
+            </div>
+            <div class="reading" id="gap">
+              <h2>Ravenel Bridge clearance</h2>
+              <p class="value"><span class="num" id="gap-value">unknown</span></p>
+              <p class="detail" id="gap-detail">Waiting for NOAA</p>
+              <svg id="gap-chart" class="gap-chart" viewBox="0 0 240 64" role="img" aria-label="Diagram of the space between the water and the bridge deck"></svg>
+              <p class="feed-note" id="gap-note" hidden></p>
+            </div>
+          </section>
 
-        <footer class="board-foot">
-          <div id="status" class="status" role="status" aria-live="polite"></div>
-          <label class="check"><input type="checkbox" id="toggle-others" checked /> <span>Show small craft</span></label>
-          <p class="credits" id="credits"></p>
-        </footer>
+          <section id="weather" class="weather" aria-label="Weather and water" hidden></section>
+
+          <section class="ships" aria-label="Ships in the harbor">
+            <div id="inbound" hidden></div>
+            <div id="ship-lists"></div>
+            <div id="harbor-log" hidden></div>
+          </section>
+
+          <footer class="board-foot">
+            <div id="status" class="status" role="status" aria-live="polite"></div>
+            <p class="credits" id="credits"></p>
+          </footer>
+        </div>
       </aside>
 
       <main id="stage">
-        <canvas id="map" tabindex="0" aria-label="Overhead map of Charleston Harbor. Drag to pan, scroll to zoom, select a ship for details."></canvas>
+        <canvas id="map" tabindex="0" aria-label="Overhead map of Charleston Harbor. Drag to pan, scroll or pinch to zoom, select a ship for details."></canvas>
         <div id="labels" aria-hidden="true"></div>
+        <div id="pins"></div>
 
         <div class="map-top">
-          <div class="mode" role="group" aria-label="Day or night view">
-            <button type="button" data-mode="auto" aria-pressed="true">Auto</button>
-            <button type="button" data-mode="day" aria-pressed="false">Day</button>
-            <button type="button" data-mode="night" aria-pressed="false">Night</button>
+          <div class="map-top-row">
+            <button type="button" id="layers-btn" class="layers-btn" aria-expanded="false" aria-controls="layers">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5 18 7l-8 4.5L2 7z" fill="currentColor"/><path d="m3.6 10.4 6.4 3.6 6.4-3.6M3.6 13.4l6.4 3.6 6.4-3.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span>Layers</span>
+            </button>
+            <div class="mode" role="group" aria-label="Day or night view">
+              <button type="button" data-mode="auto" aria-pressed="true">Auto</button>
+              <button type="button" data-mode="day" aria-pressed="false">Day</button>
+              <button type="button" data-mode="night" aria-pressed="false">Night</button>
+            </div>
           </div>
+          <button type="button" id="alert-chip" class="alert-chip" hidden></button>
           <p id="mode-note" class="mode-note"></p>
         </div>
+
+        <section id="layers" class="layers" aria-label="What the map and the board show" hidden></section>
 
         <div class="map-zoom" role="group" aria-label="Map zoom">
           <button type="button" id="zoom-in" aria-label="Zoom in">+</button>
           <button type="button" id="zoom-out" aria-label="Zoom out">&minus;</button>
-          <button type="button" id="zoom-home" class="wide">Whole harbor</button>
+          <button type="button" id="zoom-home" class="wide" aria-label="Show the whole harbor"><span class="long">Whole harbor</span><svg class="short" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 7V3h4M13 3h4v4M17 13v4h-4M7 17H3v-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         </div>
 
         <section id="card" class="card" hidden aria-live="polite"></section>

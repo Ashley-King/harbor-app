@@ -1,15 +1,17 @@
-// Live data: one call to this app's own serverless function every 10 minutes.
-// Each of the three feeds (ships, tide, bridge clearance) keeps its own state. When
+// Live data: calls to this app's own serverless functions every 10 minutes.
+// One answer carries several feeds (ships, tide and bridge clearance in the main
+// one), and each feed keeps its own state. When
 // a feed fails, the last good data stays on screen, marked stale with the time it
 // was fetched, and the next scheduled refresh tries again.
 
 export const REFRESH_MS = 10 * 60 * 1000;
-const FEEDS = ['ais', 'tide', 'airGap'];
+const MAIN_FEEDS = ['ais', 'tide', 'airGap'];
 
 export class Feed {
-  constructor(url = '/api/harbor') {
+  constructor(url = '/api/harbor', feeds = MAIN_FEEDS) {
     this.url = url;
-    this.state = Object.fromEntries(FEEDS.map((f) => [f, { data: null, at: null, stale: false, error: null }]));
+    this.feeds = feeds;
+    this.state = Object.fromEntries(feeds.map((f) => [f, { data: null, at: null, stale: false, error: null }]));
     this.lastAttempt = null;
     this.nextAt = Date.now();
     this.loading = false;
@@ -28,7 +30,7 @@ export class Feed {
       if (!document.hidden && Date.now() >= this.nextAt) this.refresh();
     });
     window.addEventListener('online', () => {
-      if (FEEDS.some((f) => this.state[f].stale)) this.refresh();
+      if (this.feeds.some((f) => this.state[f].stale)) this.refresh();
     });
   }
 
@@ -52,7 +54,7 @@ export class Feed {
     } catch (err) {
       failure = err && err.name === 'AbortError' ? 'the data service did not answer in time' : String(err && err.message ? err.message : err);
     }
-    for (const f of FEEDS) {
+    for (const f of this.feeds) {
       const st = this.state[f];
       const block = body && body[f];
       if (block && block.ok) {

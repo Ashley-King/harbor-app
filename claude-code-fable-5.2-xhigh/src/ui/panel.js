@@ -22,20 +22,35 @@ export function kindText(e) {
 
 /** The side panel: tide, bridge clearance, ships by terminal, feed status. */
 export class Panel {
-  constructor({ onSelect, onToggleOthers }) {
+  constructor({ onSelect, onInfo }) {
     this.onSelect = onSelect;
+    this.onInfo = onInfo;
+    // Which optional sections are switched on in the layers panel.
+    this.show = { weather: true, alerts: true, inbound: true, log: true };
+    this.infos = { alerts: [], inbound: [] };
+    this.logOpen = false;
+    for (const id of ['alerts', 'inbound']) {
+      $(id).addEventListener('click', (ev) => {
+        const b = ev.target.closest('[data-info]');
+        const info = b && this.infos[id][Number(b.dataset.info)];
+        if (info) this.onInfo(info);
+      });
+    }
+    $('alert-chip').addEventListener('click', () => this.infos.alerts[0] && this.onInfo(this.infos.alerts[0]));
+    $('harbor-log').addEventListener('toggle', (ev) => {
+      if (ev.target.matches('details')) this.logOpen = ev.target.open;
+    }, true);
     this.listEl = $('ship-lists');
     this.listEl.addEventListener('click', (ev) => {
       const row = ev.target.closest('[data-mmsi]');
       if (row) this.onSelect(Number(row.dataset.mmsi));
     });
-    $('toggle-others').addEventListener('change', (ev) => onToggleOthers(ev.target.checked));
     this.tugsOpen = false;
     this.smallOpen = false;
     this.listEl.addEventListener('toggle', (ev) => {
       if (!ev.target.matches('details')) return;
       if (ev.target.dataset.list === 'small') this.smallOpen = ev.target.open;
-      else this.tugsOpen = ev.target.open;
+      else if (ev.target.dataset.list === 'tugs') this.tugsOpen = ev.target.open;
     }, true);
   }
 
@@ -191,6 +206,153 @@ export class Panel {
     this.listEl.innerHTML = html;
   }
 
+  // ------------------------------------------------------------ weather, alerts, forecast
+
+  renderWeather(extras) {
+    const el = $('weather');
+    const d = extras.state.weather.data;
+    el.hidden = !this.show.weather || !d;
+    if (el.hidden) return;
+    const cell = (label, value, unit, detail) => `<div class="wx"><h2>${label}</h2><p class="value">${value != null ? `<span class="num">${esc(value)}<small>${unit}</small></span>` : '<span class="unknown">unknown</span>'}</p><p class="detail">${esc(detail || '')}</p></div>`;
+    const w = d.wind;
+    const windDetail = w ? [w.kn < 1 ? 'calm' : w.from || '', w.gustKn != null && w.gustKn >= w.kn + 3 ? `gusts ${Math.round(w.gustKn)}` : ''].filter(Boolean).join(', ') : '';
+    const html = cell('Wind', w ? Math.round(w.kn) : null, 'kn', windDetail)
+      + cell('Water', d.waterF ? Math.round(d.waterF.f) : null, '°F', d.waterF ? `${Math.round(((d.waterF.f - 32) * 5) / 9)} °C` : '')
+      + cell('Air', d.airF ? Math.round(d.airF.f) : null, '°F', d.airF ? `${Math.round(((d.airF.f - 32) * 5) / 9)} °C` : '')
+      + cell('Pressure', d.pressureMb ? Math.round(d.pressureMb.mb) : null, 'mb', extras.state.weather.stale ? 'stale' : '');
+    if (html !== this._wx) {
+      this._wx = html;
+      el.innerHTML = html;
+    }
+  }
+
+  renderMarine(extras, now = Date.now()) {
+    const el = $('alerts');
+    const chip = $('alert-chip');
+    const d = extras.state.marine.data;
+    const alerts = (this.show.alerts && d && d.alerts) || [];
+    const forecast = this.show.alerts && d ? d.forecast : null;
+    const until = (a) => (a.ends && Date.parse(a.ends) > now ? `until ${clockSmart(Date.parse(a.ends), now)}` : '');
+    const infos = alerts.map((a) => ({
+      title: a.event,
+      sub: [a.severity && a.severity !== 'Unknown' ? `${a.severity} severity` : '', until(a)].filter(Boolean).join(', '),
+      text: [...String(a.text || '').split(/\n{2,}/).map((t) => t.replace(/\n/g, ' ').trim()).filter(Boolean).slice(0, 5), a.instruction].filter(Boolean),
+      note: 'From the National Weather Service, for the Charleston Harbor marine zone.',
+      links: [{ href: 'https://www.weather.gov/chs/marine', text: 'NWS Charleston marine page' }],
+    }));
+    if (forecast) {
+      infos.push({
+        title: 'Harbor forecast',
+        sub: forecast.issued ? `National Weather Service, issued ${clockSmart(Date.parse(forecast.issued), now)}` : 'National Weather Service',
+        rows: forecast.periods.map((p) => [cap(p.name.toLowerCase()), p.text]),
+        links: [{ href: 'https://www.weather.gov/chs/marine', text: 'NWS Charleston marine page' }],
+      });
+    }
+    this.infos.alerts = infos;
+    const first = forecast && forecast.periods[0];
+    const html = alerts.map((a, i) => `<button type="button" class="alert" data-info="${i}"><span class="mark" aria-hidden="true">!</span><span><strong>${esc(a.event)}</strong>${until(a) ? ` <span class="when">${esc(until(a))}</span>` : ''}</span></button>`).join('')
+      + (first ? `<button type="button" class="forecast" data-info="${alerts.length}"><strong>${esc(cap(first.name.toLowerCase()))}</strong> ${esc(first.text)}</button>` : '');
+    el.hidden = !html;
+    if (html !== this._marine) {
+      this._marine = html;
+      el.innerHTML = html;
+    }
+    // The same alert as a small chip on the map, so it is seen with the board closed.
+    chip.hidden = !alerts.length;
+    if (alerts.length) chip.textContent = alerts.length > 1 ? `${alerts[0].event} and ${alerts.length - 1} more` : alerts[0].event;
+  }
+
+  // ------------------------------------------------------------ ships still at sea
+
+  renderInbound(extras, now = Date.now()) {
+    const el = $('inbound');
+    const st = extras.state.inbound;
+    el.hidden = !this.show.inbound || !st.data;
+    if (el.hidden) return;
+    const ships = st.data.ships || [];
+    this.infos.inbound = ships.map((v) => {
+      const eta = Date.parse(v.seen) + v.etaMinutes * 60000;
+      return {
+        title: v.name || `MMSI ${v.mmsi}`,
+        sub: `${v.distanceNm} nautical miles from the jetties, making ${v.sog.toFixed(1)} knots`,
+        text: [`At this speed she reaches the harbor entrance about ${clockSmart(eta, now)}. She joins the map when she passes the jetties.`],
+        rows: [
+          ['Type', aisTypeName(v.type) || 'unknown'],
+          ['Flag', countryName(v.flag) || v.flag || 'unknown'],
+          ['Size', v.length != null && v.beam != null ? `${v.length} m × ${v.beam} m` : 'unknown'],
+          ['Draught', v.draught != null ? `${v.draught.toFixed(1)} m` : 'unknown'],
+          ['Destination', v.destination || 'unknown'],
+          ['Last report', `${clockSmart(Date.parse(v.seen), now)}, ${ago(Date.parse(v.seen), now)}`],
+        ],
+        note: 'Ships are only heard offshore while they are in range of a receiver on land, usually 20 to 40 nautical miles.',
+      };
+    });
+    const row = (v, i) => {
+      const eta = Date.parse(v.seen) + v.etaMinutes * 60000;
+      const what = [aisTypeName(v.type), countryName(v.flag)].filter(Boolean).join(', ');
+      return `<li><button type="button" class="ship" data-info="${i}" data-kind="ship">
+        ${hullIcon(v.length)}
+        <span class="txt"><span class="name">${esc(v.name || `MMSI ${v.mmsi}`)}</span><span class="what">${esc(what)}</span></span>
+        <span class="size">${esc(`${Math.round(v.distanceNm)} nm out`)}<small>${esc(`jetties ${clock(eta)}`)}</small></span></button></li>`;
+    };
+    const html = `<div class="group"><h2>Arriving from sea<span class="count">${ships.length === 1 ? '1 ship' : `${ships.length} ships`}</span></h2>${ships.length ? `<ul class="ship-list">${ships.map(row).join('')}</ul>` : '<p class="empty">No ship in range offshore is heading in</p>'}</div>`;
+    if (html !== this._inbound) {
+      this._inbound = html;
+      el.innerHTML = html;
+    }
+  }
+
+  // ------------------------------------------------------------ harbor log
+
+  renderLog(logFeed, now = Date.now()) {
+    const el = $('harbor-log');
+    const st = logFeed.state.log;
+    const d = st.data;
+    // On a host without the log (Vercel) the section simply is not there.
+    el.hidden = !this.show.log || (!d && st.error !== 'not started');
+    if (el.hidden) return;
+    let body;
+    if (!d) {
+      body = '<p class="empty">The log starts with the next ten minute check of the harbor.</p>';
+    } else {
+      const days = Object.keys(d.days || {}).sort();
+      const today = d.days[days[days.length - 1]] || { arrivals: [], departures: [], ships: [] };
+      const n = (k, one, many) => `${k} ${k === 1 ? one : many}`;
+      const stays = Object.values(d.present || {}).filter((s) => s.since).sort((a, b) => Date.parse(a.since) - Date.parse(b.since));
+      const longest = stays[0];
+      const stay = (ms) => (ms >= 2 * 86400e3 ? `${Math.round(ms / 86400e3)} days` : `${Math.max(1, Math.round(ms / 3600e3))} hours`);
+      const events = [...today.arrivals.map((a) => ({ ...a, what: 'arrived' })), ...today.departures.map((a) => ({ ...a, what: 'left' }))]
+        .sort((a, b) => Date.parse(b.t) - Date.parse(a.t)).slice(0, 8);
+      const facts = [
+        ['Today', `${n(today.arrivals.length, 'arrival', 'arrivals')}, ${n(today.departures.length, 'departure', 'departures')}, ${n((today.ships || []).length, 'ship', 'ships')} seen`],
+        today.biggest ? ['Biggest today', `${today.biggest.name || `MMSI ${today.biggest.mmsi}`}, ${Math.round(today.biggest.length)} m`] : null,
+        longest ? ['Longest stay', `${longest.name || `MMSI ${longest.mmsi}`}, here ${stay(now - Date.parse(longest.since))}`] : null,
+      ].filter(Boolean);
+      body = `<dl class="log-facts">${facts.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>`
+        + (events.length ? `<ul class="log-events">${events.map((e) => `<li><time>${esc(clock(Date.parse(e.t)))}</time><span>${esc(e.name || `MMSI ${e.mmsi}`)} ${e.what}${e.stayHours ? ` after ${esc(stay(e.stayHours * 3600e3))}` : ''}</span></li>`).join('')}</ul>` : '')
+        + `<p class="empty">Large ships only. Kept since ${esc(clockSmart(Date.parse(d.since), now))}.</p>`;
+    }
+    const html = `<details class="group" data-list="log"${this.logOpen ? ' open' : ''}><summary><h2>Harbor log</h2></summary>${body}</details>`;
+    if (html !== this._log) {
+      this._log = html;
+      el.innerHTML = html;
+    }
+  }
+
+  /** One line for the handle of the board on a phone. */
+  renderSummary(feed, fleet) {
+    const tide = feed.state.tide.data;
+    const ships = [...fleet.entities.values()].filter((e) => !e.gone && e.group === 'ship').length;
+    const parts = [];
+    if (tide && tide.level) parts.push(`Tide ${tide.level.ft.toFixed(1)} ft${tide.ftPerHour == null || Math.abs(tide.ftPerHour) < 0.15 ? '' : tide.ftPerHour > 0 ? ' rising' : ' falling'}`);
+    if (feed.state.ais.data) parts.push(ships === 1 ? '1 large ship' : `${ships} large ships`);
+    const text = parts.join(' · ') || 'Tide, bridge and ships';
+    if (text !== this._sum) {
+      this._sum = text;
+      $('sheet-sum').textContent = text;
+    }
+  }
+
   // ------------------------------------------------------------ status
 
   renderStatus(feed, now = Date.now()) {
@@ -225,7 +387,7 @@ export class Panel {
   renderCredits(feed) {
     const ais = (feed.state.ais.data && feed.state.ais.data.attribution) || ['Open Waters AIS (https://openwaters.io/ais/)'];
     const names = ais.map((s) => s.replace(/\s*\(https?:[^)]*\)/, '')).join(', ');
-    const text = `Imagery: USGS The National Map, USDA NAIP aerial photos. Map data: © OpenStreetMap contributors. Channel: US Army Corps of Engineers. Ships: ${names}. Tide and clearance: NOAA CO-OPS.`;
+    const text = `Imagery: USGS The National Map, USDA NAIP aerial photos. Map data: © OpenStreetMap contributors. Channel: US Army Corps of Engineers. Ships: ${names}. Tide, clearance, weather and currents: NOAA CO-OPS. Buoys, lights and wrecks: NOAA Office of Coast Survey. Alerts and forecast: National Weather Service. Dolphin sightings: iNaturalist. Ship backstories: Wikidata and Wikimedia Commons.`;
     if (text !== this._credits) {
       this._credits = text;
       $('map-credits').textContent = text;

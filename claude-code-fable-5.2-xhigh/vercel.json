@@ -4,7 +4,8 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "functions": {
-    "api/harbor.js": { "maxDuration": 30 }
+    "api/harbor.js": { "maxDuration": 30 },
+    "api/extras.js": { "maxDuration": 30 }
   },
   "headers": [
     {

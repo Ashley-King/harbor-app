@@ -33,6 +33,9 @@ export class Labels {
     for (const l of harbor.labels) add(l.text, l.at, l.kind, l.tier, l.kind === 'water' ? 6 : l.kind === 'place' ? 5 : 3);
     this.fixed.sort((a, b) => b.priority - a.priority);
     this._measured = false;
+    // Switched from the layers panel.
+    this.showShips = true;
+    this.showChannel = true;
   }
 
   _measure() {
@@ -67,7 +70,7 @@ export class Labels {
 
     // ---- fixed names
     for (const f of this.fixed) {
-      let show = f.tier <= tier;
+      let show = f.tier <= tier && (this.showChannel || (f.kind !== 'channel' && f.kind !== 'reach'));
       let x = 0, y = 0;
       if (show) {
         const p = stage.worldToScreen(f.at[0], f.at[1], 0);
@@ -95,7 +98,7 @@ export class Labels {
       if (e.group === 'ship') ok = ok || len >= 150 || mpp < 11;
       else if (e.group === 'tug' || e.group === 'pilot') ok = ok || mpp < 3.2;
       else ok = ok || mpp < 1.4;
-      if (!ok || !e.v.name) continue;
+      if (!ok || !e.v.name || (!this.showShips && !isSel)) continue;
       want.push({ e, isSel, score: (isSel ? 1e6 : 0) + (e.group === 'ship' ? 1000 : 0) + len });
     }
     want.sort((a, b) => b.score - a.score);

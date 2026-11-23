@@ -12,7 +12,7 @@
 import { hullDimensions, vesselGroup, num, cleanText } from './vessels.js';
 
 const UA = 'harbor-bench/1.0';
-const AIS_BASE = 'https://ais.openwaters.io/v1/vessels';
+export const AIS_BASE = 'https://ais.openwaters.io/v1/vessels';
 const AIS_URL = `${AIS_BASE}?bbox=32.70,-80.05,32.95,-79.75`;
 const NOAA = 'https://api.tidesandcurrents.noaa.gov/api/prod/datagetter';
 const TIDE_STATION = '8665530';
@@ -20,15 +20,15 @@ const AIRGAP_STATION = '8665353';
 const TRACK_MINUTES = 25;
 const MAX_TRACKS = 40;            // a host with a tighter limit on outgoing calls passes a lower number
 
-const lastGood = { ais: null, tide: null, airGap: null };
+const lastGood = {};
 
-async function getJson(url, { timeout = 12000, retries = 1 } = {}) {
+export async function getJson(url, { timeout = 12000, retries = 1, accept = 'application/json' } = {}) {
   let lastErr;
   for (let attempt = 0; attempt <= retries; attempt++) {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), timeout);
     try {
-      const res = await fetch(url, { headers: { 'User-Agent': UA, Accept: 'application/json' }, signal: ctrl.signal });
+      const res = await fetch(url, { headers: { 'User-Agent': UA, Accept: accept }, signal: ctrl.signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return await res.json();
     } catch (err) {
@@ -42,7 +42,7 @@ async function getJson(url, { timeout = 12000, retries = 1 } = {}) {
 
 // ---------------------------------------------------------------- AIS
 
-function normalizeVessel(f) {
+export function normalizeVessel(f) {
   const p = f.properties || {};
   const c = f.geometry && f.geometry.coordinates;
   if (!c || !Number.isFinite(c[0]) || !Number.isFinite(c[1])) return null;
@@ -75,7 +75,7 @@ function normalizeVessel(f) {
 
 // IMO numbers are seven digits with a check digit. Anything else is a typing error
 // in the transponder, so it is dropped and shown as unknown.
-function validImo(v) {
+export function validImo(v) {
   const n = num(v);
   if (n == null) return null;
   const s = String(Math.trunc(n));
@@ -109,10 +109,16 @@ async function fetchTrack(mmsi, fromIso) {
   return out;
 }
 
-async function loadAis(maxTracks) {
-  const d = await getJson(AIS_URL);
+/** Every vessel in a box, as the page reads them. `bbox` is "south,west,north,east". */
+export async function aisVessels(bbox) {
+  const d = await getJson(bbox ? `${AIS_BASE}?bbox=${bbox}` : AIS_URL);
   if (!d || !Array.isArray(d.features)) throw new Error('unexpected response');
   const vessels = d.features.filter((f) => (f.properties?.kind || 'vessel') === 'vessel').map(normalizeVessel).filter(Boolean);
+  return { vessels, raw: d };
+}
+
+async function loadAis(maxTracks) {
+  const { vessels, raw: d } = await aisVessels();
 
   // Real track for vessels that are under way, so the page can move them along the
   // path they actually took instead of a straight line between two reports.
@@ -139,20 +145,20 @@ async function loadAis(maxTracks) {
 
 // ---------------------------------------------------------------- NOAA
 
-function noaaUrl(params) {
+export function noaaUrl(params) {
   const q = new URLSearchParams({ application: 'harbor-bench', time_zone: 'gmt', units: 'english', format: 'json', ...params });
   return `${NOAA}?${q}`;
 }
 
 const noaaTime = (t) => `${t.replace(' ', 'T')}:00Z`;
 
-function yyyymmddhhmm(ms) {
+export function yyyymmddhhmm(ms) {
   const d = new Date(ms);
   const p = (n) => String(n).padStart(2, '0');
   return `${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`;
 }
 
-function readSeries(d) {
+export function readSeries(d) {
   if (d && d.error) throw new Error(d.error.message || 'NOAA error');
   const rows = (d && (d.data || d.predictions)) || [];
   return rows
@@ -213,7 +219,7 @@ function safe(fn) {
 
 // ---------------------------------------------------------------- all three
 
-async function feed(name, loader) {
+export async function feed(name, loader) {
   const fetchedAt = new Date().toISOString();
   try {
     const data = await loader();

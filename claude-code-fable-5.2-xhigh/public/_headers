@@ -1,7 +1,8 @@
 # Cloudflare: headers for the static files (Vercel reads its own from vercel.json).
 
 # Security headers on everything. The page loads its own code, styles and fonts only.
-# The one outside address is the USGS imagery server, for map tiles, as images.
+# Two outside addresses are allowed, both for images only: the USGS imagery server
+# for map tiles and Wikimedia Commons for a ship's photo.
 /*
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
@@ -9,7 +10,7 @@
   Strict-Transport-Security: max-age=15552000
   Cross-Origin-Opener-Policy: same-origin
   Permissions-Policy: accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://basemap.nationalmap.gov; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://basemap.nationalmap.gov https://commons.wikimedia.org https://upload.wikimedia.org; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests
 
 # Cache rules.
 /assets/*

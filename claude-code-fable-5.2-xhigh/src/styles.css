@@ -83,6 +83,9 @@ button, input { font: inherit; color: inherit; }
   transition: background-color 0.6s, color 0.6s;
 }
 
+.board-body { display: flex; flex-direction: column; flex: 1 0 auto; min-height: 0; }
+.sheet-handle { display: none; }
+
 .board-head { padding: 1.35rem 1.4rem 1rem; }
 
 .board-head h1 {
@@ -125,6 +128,29 @@ button, input { font: inherit; color: inherit; }
 
 .feed-note { margin-top: 0.4rem; font-size: 0.78rem; color: var(--warn); }
 
+/* ------------------------------------------------------------ weather, alerts, forecast */
+
+.weather { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 0.75rem 1.4rem 0.7rem; gap: 0.4rem; border-bottom: 1px solid var(--line); }
+.weather[hidden], .alerts[hidden] { display: none; }
+.wx h2 { font-size: 0.78rem; font-weight: 500; color: var(--muted); }
+.wx .value { line-height: 1.1; }
+.wx .num { font-family: 'Barlow Semi Condensed', 'Barlow', sans-serif; font-weight: 600; font-size: 1.45rem; font-variant-numeric: tabular-nums; color: var(--text); }
+.wx .num small { font-size: 0.55em; font-weight: 500; margin-left: 0.15em; color: var(--muted); }
+.wx .unknown { font-size: 0.84rem; font-style: italic; color: var(--muted); }
+.wx .detail { font-size: 0.74rem; color: var(--muted); min-height: 1.4em; }
+
+.alerts { display: flex; flex-direction: column; gap: 0.35rem; padding: 0 1.4rem 0.9rem; }
+.alerts button { display: flex; gap: 0.55rem; align-items: baseline; width: 100%; padding: 0.5rem 0.7rem; border: 1px solid var(--line); border-radius: 0.5rem; background: var(--panel-2); text-align: left; font-size: 0.86rem; line-height: 1.35; cursor: pointer; }
+.alerts button:hover { border-color: var(--accent); }
+.alerts .alert { border-color: var(--warn); }
+.alerts .alert .mark, .alert-chip::before {
+  flex: none; display: inline-grid; place-items: center; width: 1.15rem; height: 1.15rem; border-radius: 50%;
+  background: var(--warn); color: #1a1205; font-weight: 600; font-size: 0.8rem; line-height: 1;
+}
+.alerts .when { color: var(--muted); white-space: nowrap; }
+.alerts .forecast { display: block; color: var(--text); }
+.alerts .forecast strong { font-weight: 600; margin-right: 0.3em; }
+
 /* ------------------------------------------------------------ ship lists */
 
 .ships { flex: 1 0 auto; padding: 0.4rem 0 0.8rem; }
@@ -162,7 +188,7 @@ button, input { font: inherit; color: inherit; }
 }
 
 .ship:hover { background: var(--panel-2); }
-.ship:focus-visible, button:focus-visible, canvas:focus-visible, .check input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ship:focus-visible, button:focus-visible, canvas:focus-visible, a:focus-visible, .switch input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
 .ship[aria-current='true'] { background: var(--panel-2); box-shadow: inset 2px 0 0 var(--accent); }
 
 .ship .hull { width: 3.3rem; height: 0.95rem; color: var(--muted); }
@@ -188,7 +214,7 @@ button, input { font: inherit; color: inherit; }
 
 details.group > summary { list-style: none; cursor: pointer; }
 details.group > summary::-webkit-details-marker { display: none; }
-details.group > summary h2::after { content: 'Show'; font-family: 'Barlow', sans-serif; font-weight: 400; font-size: 0.8rem; color: var(--accent); margin-left: auto; }
+details.group > summary h2::after { content: 'Show'; padding: 0.3rem 0; font-family: 'Barlow', sans-serif; font-weight: 400; font-size: 0.8rem; color: var(--accent); margin-left: auto; }
 details.group[open] > summary h2::after { content: 'Hide'; }
 details.group > summary h2 .count { margin-left: 0.2rem; }
 details.group > summary h2 { justify-content: flex-start; }
@@ -204,8 +230,14 @@ details.group > summary h2 { justify-content: flex-start; }
 .status .is-stale { color: var(--warn); }
 .status .next { color: var(--muted); padding-left: 1rem; font-variant-numeric: tabular-nums; }
 
-.check { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.75rem; cursor: pointer; }
-.check input { width: 1rem; height: 1rem; accent-color: var(--accent); }
+/* ------------------------------------------------------------ harbor log */
+
+.log-facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.2rem 0.9rem; margin: 0.4rem 0 0.3rem; font-size: 0.86rem; }
+.log-facts dt { color: var(--muted); }
+.log-facts dd { margin: 0; }
+.log-events { list-style: none; margin: 0.4rem 0 0.2rem; padding: 0; font-size: 0.86rem; }
+.log-events li { display: grid; grid-template-columns: 4.6rem minmax(0, 1fr); gap: 0.6rem; padding: 0.16rem 0; }
+.log-events time { color: var(--muted); font-variant-numeric: tabular-nums; }
 
 .credits { margin-top: 0.8rem; font-size: 0.74rem; line-height: 1.45; color: var(--muted); }
 .credits a { color: inherit; }
@@ -268,7 +300,30 @@ details.group > summary h2 { justify-content: flex-start; }
   text-shadow: none;
 }
 
-.map-top { position: absolute; top: 0.9rem; right: 0.9rem; display: flex; flex-direction: column; align-items: flex-end; gap: 0.35rem; }
+.map-top { position: absolute; z-index: 2; top: 0.9rem; right: 0.9rem; display: flex; flex-direction: column; align-items: flex-end; gap: 0.35rem; max-width: calc(100% - 1.8rem); pointer-events: none; }
+.map-top > * { pointer-events: auto; }
+.map-top-row { display: flex; gap: 0.5rem; }
+
+.layers-btn, .alert-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.3rem;
+  padding: 0 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+  background: var(--glass);
+  font-weight: 500;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: var(--shadow);
+}
+.layers-btn svg { width: 1.1rem; height: 1.1rem; }
+.layers-btn:hover, .layers-btn[aria-expanded='true'] { border-color: var(--accent); }
+.alert-chip { border-color: var(--warn); font-size: 0.86rem; max-width: 100%; text-align: left; }
+.alert-chip::before { content: '!'; }
+.alert-chip[hidden] { display: none; }
 
 .mode, .map-zoom {
   display: flex;
@@ -323,17 +378,103 @@ details.group > summary h2 { justify-content: flex-start; }
   pointer-events: none;
 }
 
-/* ------------------------------------------------------------ ship card */
+/* ------------------------------------------------------------ layers panel */
+
+.layers {
+  position: absolute;
+  z-index: 4;
+  top: 3.9rem;
+  right: 0.9rem;
+  width: min(19rem, calc(100% - 1.8rem));
+  max-height: calc(100% - 5.2rem);
+  overflow-y: auto;
+  padding: 0.8rem 1rem 0.9rem;
+  background: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: var(--shadow);
+  scrollbar-width: thin;
+}
+.layers[hidden] { display: none; }
+.layers header { display: flex; align-items: center; justify-content: space-between; }
+.layers h2 { font-family: 'Barlow Semi Condensed', 'Barlow', sans-serif; font-weight: 600; font-size: 1.2rem; }
+.layers fieldset { margin: 0.5rem 0 0; padding: 0; border: 0; }
+.layers legend { padding: 0; font-size: 0.78rem; font-weight: 500; color: var(--muted); }
+
+.switch { display: flex; align-items: center; gap: 0.7rem; min-height: 2.5rem; padding: 0.25rem 0; cursor: pointer; }
+.switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.switch .track { flex: none; position: relative; width: 2.3rem; height: 1.3rem; border-radius: 1rem; background: var(--panel-2); border: 1px solid var(--muted); transition: background-color 0.15s, border-color 0.15s; }
+.switch .track::after { content: ''; position: absolute; top: 50%; left: 0.14rem; width: 0.92rem; height: 0.92rem; margin-top: -0.46rem; border-radius: 50%; background: var(--muted); transition: transform 0.15s, background-color 0.15s; }
+.switch input:checked + .track { background: var(--accent); border-color: var(--accent); }
+.switch input:checked + .track::after { transform: translateX(1rem); background: #fff; }
+.switch .text { font-size: 0.92rem; line-height: 1.2; }
+.switch .text small { display: block; font-size: 0.76rem; color: var(--muted); }
+
+/* ------------------------------------------------------------ pins */
+
+#pins { position: absolute; z-index: 0; inset: 0; pointer-events: none; overflow: hidden; }
+
+.pin {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1.7rem;
+  height: 1.7rem;
+  margin: -0.85rem 0 0 -0.85rem;
+  padding: 0;
+  border: 1.5px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.55);
+  pointer-events: auto;
+  cursor: pointer;
+  will-change: transform;
+}
+.pin[hidden] { display: none; }
+.pin svg { display: block; width: 100%; height: 100%; }
+.pin.k-landmarks { background: #b8741a; }
+.pin.k-wrecks { background: #8a2f2a; }
+.pin.k-dolphins { background: #12808c; }
+.pin:hover { border-color: var(--accent); }
+/* A finger needs a bigger target than the picture. */
+.pin::after { content: ''; position: absolute; inset: -0.5rem; }
+
+.pin.k-currents { width: 2.6rem; height: 2.6rem; margin: -1.3rem 0 0 -1.3rem; border: 0; border-radius: 0; background: none; box-shadow: none; }
+/* An arrow never takes a tap meant for a landmark or wreck beside it. */
+.pin.k-landmarks, .pin.k-wrecks, .pin.k-dolphins { z-index: 1; }
+.pin.k-currents::after { inset: 0; }
+.pin.k-currents .arrow { overflow: visible; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7)); }
+.pin.k-currents .arrow path { fill: #6fd3ff; stroke: #06283d; stroke-width: 1.4; stroke-linejoin: round; }
+.pin.k-currents.is-slack .arrow path { fill: #e8f4fb; }
+.pin.k-currents .tag {
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  transform: translateX(-50%);
+  padding: 0.05rem 0.4rem;
+  border-radius: 0.3rem;
+  background: rgba(6, 30, 46, 0.86);
+  color: #d5f0ff;
+  font-size: 0.72rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+#pins.is-wide .pin.k-currents .tag { display: none; }
+
+/* ------------------------------------------------------------ card */
+/* Compact by default, so the ship and the harbor stay in view beside it. */
 
 .card {
   position: absolute;
   z-index: 3;
   top: 0.9rem;
   left: 0.9rem;
-  width: min(22.5rem, calc(100% - 1.8rem));
+  width: min(21rem, calc(100% - 1.8rem));
   max-height: calc(100% - 4.4rem);
   overflow-y: auto;
-  padding: 1rem 1.1rem 1rem;
+  overscroll-behavior: contain;
+  padding: 0.9rem 1.05rem 0.95rem;
   background: var(--glass);
   border: 1px solid var(--line);
   border-radius: 0.7rem;
@@ -345,10 +486,26 @@ details.group > summary h2 { justify-content: flex-start; }
 
 .card[hidden] { display: none; }
 
-.card h2 { font-family: 'Barlow Semi Condensed', 'Barlow', sans-serif; font-weight: 600; font-size: 1.5rem; line-height: 1.1; padding-right: 2.2rem; overflow-wrap: anywhere; }
-.card .sub { margin-top: 0.25rem; font-size: 0.88rem; color: var(--text); }
+.card h2 { font-family: 'Barlow Semi Condensed', 'Barlow', sans-serif; font-weight: 600; font-size: 1.4rem; line-height: 1.1; padding-right: 2.6rem; overflow-wrap: anywhere; }
+.card .sub { margin-top: 0.2rem; font-size: 0.88rem; color: var(--text); }
+.card .sub .kind { display: block; color: var(--muted); }
+.card .facts { list-style: none; margin: 0.55rem 0 0; padding: 0; font-size: 0.88rem; line-height: 1.35; }
+.card .facts li { padding: 0.3rem 0 0.3rem 0.75rem; border-left: 2px solid var(--accent); }
+.card .facts li + li { margin-top: 0.3rem; }
+.card .para { margin-top: 0.55rem; font-size: 0.9rem; line-height: 1.45; }
+.card .note { margin-top: 0.55rem; font-size: 0.8rem; color: var(--muted); }
+.card .links { margin-top: 0.55rem; font-size: 0.86rem; }
+.card a { color: var(--accent); text-underline-offset: 0.15em; }
 .card .plan { display: block; width: 100%; height: auto; margin: 0.7rem 0 0.2rem; color: var(--accent); }
 .card .plan text { fill: var(--muted); font-size: 11px; font-family: 'Barlow', sans-serif; }
+.card .more { margin-top: 0.8rem; padding-top: 0.2rem; border-top: 1px solid var(--line); }
+.card .story { margin-top: 0.7rem; font-size: 0.88rem; line-height: 1.4; }
+.card .story-note { margin-top: 0.7rem; font-size: 0.82rem; color: var(--muted); }
+.card .story-links { white-space: nowrap; }
+.card .photo { margin: 0 0 0.5rem; }
+.card .photo img { display: block; width: 100%; max-height: 11rem; object-fit: cover; border-radius: 0.45rem; background: var(--panel-2); }
+.card .photo figcaption { margin-top: 0.2rem; font-size: 0.72rem; }
+.card .photo figcaption a { color: var(--muted); }
 
 .card dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.28rem 0.9rem; margin: 0.6rem 0 0; font-size: 0.9rem; }
 .card dt { color: var(--muted); }
@@ -357,17 +514,19 @@ details.group > summary h2 { justify-content: flex-start; }
 .card dd small { display: block; font-size: 0.82em; color: var(--muted); }
 .card .warn { margin-top: 0.6rem; font-size: 0.82rem; color: var(--warn); }
 
-.card .actions { display: flex; gap: 0.5rem; margin-top: 0.85rem; }
-.card .actions button, .card .close {
+.card .actions { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+.card .actions button, .card .close, .layers .close {
   border: 1px solid var(--line);
   border-radius: 0.45rem;
   background: var(--panel-2);
+  min-height: 2.3rem;
   padding: 0.38rem 0.8rem;
   font-weight: 500;
   cursor: pointer;
 }
-.card .actions button:hover, .card .close:hover { border-color: var(--accent); }
-.card .close { position: absolute; top: 0.75rem; right: 0.75rem; width: 2rem; height: 2rem; padding: 0; font-size: 1.1rem; line-height: 1; }
+.card .actions button:hover, .card .close:hover, .layers .close:hover { border-color: var(--accent); }
+.card .close { position: absolute; top: 0.65rem; right: 0.65rem; }
+.card .close, .layers .close { width: 2.3rem; height: 2.3rem; padding: 0; font-size: 1.2rem; line-height: 1; }
 
 /* ------------------------------------------------------------ loading and errors */
 
@@ -386,15 +545,104 @@ details.group > summary h2 { justify-content: flex-start; }
 .loading.is-done { opacity: 0; pointer-events: none; }
 .loading.is-error { color: #ffb24a; padding: 2rem; text-align: center; }
 
-/* ------------------------------------------------------------ small screens */
+/* ------------------------------------------------------------ phones */
+/* The map fills the screen. The board is a sheet that slides up from the bottom
+   edge, and the card and the layers panel dock there too, so the map above them
+   stays in view. Everything a finger presses is at least 44 pixels tall. */
 
 @media (max-width: 820px) {
-  html, body { overflow: auto; }
-  #app { grid-template-columns: 1fr; grid-template-rows: 62dvh auto; height: auto; }
-  #stage { grid-row: 1; height: 62dvh; }
-  #board { grid-row: 2; border-right: 0; border-top: 1px solid var(--line); overflow: visible; }
-  .card { max-height: calc(100% - 1.8rem); }
-  .map-zoom button.wide { display: none; }
+  :root { --peek: calc(4.4rem + env(safe-area-inset-bottom, 0px)); font-size: 15px; }
+  #app { display: block; height: 100dvh; }
+  #stage { position: fixed; inset: 0; }
+
+  #board {
+    position: fixed;
+    z-index: 5;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: min(78dvh, calc(100dvh - 4.5rem));
+    border-right: 0;
+    border-top: 1px solid var(--line);
+    border-radius: 1rem 1rem 0 0;
+    box-shadow: 0 -0.4rem 1.6rem rgba(0, 0, 0, 0.4);
+    overflow: hidden;
+    transform: translateY(calc(100% - var(--peek)));
+    transition: transform 0.28s ease, background-color 0.6s, color 0.6s;
+  }
+  #board.is-open { transform: none; }
+  /* The card and the layers panel take the board's place while they are open. */
+  .card-open #board, .layers-open #board { transform: translateY(100%); }
+  .card-open .map-zoom, .layers-open .map-zoom { display: none; }
+  .sheet-handle {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: baseline;
+    column-gap: 0.8rem;
+    flex: none;
+    width: 100%;
+    height: var(--peek);
+    padding: 1.15rem 1.1rem calc(0.5rem + env(safe-area-inset-bottom, 0px));
+    border: 0;
+    background: none;
+    text-align: left;
+    cursor: pointer;
+    touch-action: none;
+    position: relative;
+  }
+  .sheet-handle .grip { position: absolute; top: 0.5rem; left: 50%; width: 2.6rem; height: 0.28rem; margin-left: -1.3rem; border-radius: 1rem; background: var(--muted); opacity: 0.7; }
+  .sheet-handle .sheet-title { font-family: 'Barlow Semi Condensed', 'Barlow', sans-serif; font-weight: 600; font-size: 1.3rem; white-space: nowrap; }
+  .sheet-handle .sheet-sum { grid-column: 1 / -1; font-size: 0.88rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sheet-handle::after { content: 'Open'; font-size: 0.86rem; font-weight: 500; color: var(--accent); grid-column: 2; grid-row: 1; }
+  .sheet-handle[aria-expanded='true']::after { content: 'Close'; }
+  .board-body { flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .board-head { display: none; }
+  .conditions { border-top: 1px solid var(--line); }
+  .reading { padding-left: 1.1rem; }
+  .weather, .alerts { padding-left: 1.1rem; padding-right: 1.1rem; }
+  .alerts { padding-top: 0.2rem; }
+  .group { padding-left: 1.1rem; padding-right: 1.1rem; }
+  .board-foot { padding-left: 1.1rem; padding-right: 1.1rem; }
+  .ship { min-height: 3rem; }
+  details.group > summary h2 { min-height: 2.75rem; align-items: center; }
+
+  .map-top { top: calc(0.6rem + env(safe-area-inset-top, 0px)); right: 0.6rem; max-width: calc(100% - 1.2rem); }
+  .mode button, .map-zoom button, .layers-btn { min-height: 2.75rem; min-width: 2.75rem; }
+  .mode-note, .map-credits { display: none; }
+  .map-zoom { right: 0.6rem; bottom: calc(var(--peek) + 0.7rem); flex-direction: column; }
+  .map-zoom button + button { border-left: 0; border-top: 1px solid var(--line); }
+  .map-zoom button.wide { padding: 0; }
+  .map-zoom .long { display: none; }
+  .map-zoom .short { display: block; width: 1.25rem; height: 1.25rem; margin: 0 auto; }
+
+  .card, .layers {
+    position: fixed;
+    z-index: 6;
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    border-radius: 1rem 1rem 0 0;
+    border-width: 1px 0 0;
+    padding-bottom: calc(0.95rem + env(safe-area-inset-bottom, 0px));
+    background: var(--panel);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: 0 -0.4rem 1.6rem rgba(0, 0, 0, 0.4);
+  }
+  /* Compact, the card is a little over a quarter of the screen. Opened, it stops at
+     half, and its contents scroll. */
+  .card { max-height: 50dvh; }
+  .layers { max-height: 72dvh; }
+  .card .actions button { flex: 1; min-height: 2.75rem; }
+  .card .close, .layers .close { width: 2.75rem; height: 2.75rem; }
+  .card h2 { padding-right: 3.2rem; }
+  .switch { min-height: 2.9rem; }
+}
+
+@media (min-width: 821px) {
+  .map-zoom .short { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -142,7 +142,7 @@ export const RED = [1.0, 0.07, 0.04];
 export const GREEN = [0.08, 1.0, 0.32];
 export const WHITE = [1.0, 0.97, 0.9];
 
-/** All fixed lights: streets, terminals, docks, bridges, cranes, buoys. */
+/** All fixed lights: streets, terminals, docks, bridges, cranes. Buoys and beacons are in aids.js. */
 export function buildCityLights(bin, harbor, shared) {
   const data = new Int16Array(bin);
   const n = Math.floor(data.length / 3);
@@ -195,13 +195,6 @@ export function buildCityLights(bin, harbor, shared) {
       for (let d = 20; d < len; d += 34) for (const s of [-1, 1]) field.add(t1[0] + ux * d + nx * 14 * s, t1[1] + uy * d + ny * 14 * s, 8, NEUTRAL, 1.1, 7.5, 40, 0.55);
     }
   }
-
-  // ---- lit buoys and beacons flash their charted colour
-  harbor.aids.forEach((a, i) => {
-    const c = a.c === 'r' ? RED : a.c === 'g' ? GREEN : a.c === 'y' ? [1, 0.8, 0.1] : WHITE;
-    const period = [4, 2.5, 6, 4][i % 4];
-    field.add(a.at[0], a.at[1], 3, c, 1.9, 4.6, 0, 0, [period, rand(), period === 2.5 ? 0.2 : 0.14]);
-  });
 
   field.commit();
   return field;
