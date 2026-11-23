@@ -272,6 +272,8 @@ async function boot() {
     else closeCard();
   };
   stage.onHover = (x, y) => canvas.classList.toggle('is-over', x >= 0 && !!fleet.pick(x, y));
+  // Safari on a phone would otherwise zoom the whole page when a pinch starts on a button or a pin.
+  for (const type of ['gesturestart', 'gesturechange']) $('stage').addEventListener(type, (ev) => ev.preventDefault());
   canvas.addEventListener('pointerdown', () => canvas.classList.add('is-dragging'));
   window.addEventListener('pointerup', () => canvas.classList.remove('is-dragging'));
   window.addEventListener('keydown', (ev) => {
@@ -283,14 +285,19 @@ async function boot() {
   let swipe = null;
   handle.addEventListener('pointerdown', (ev) => {
     swipe = { y: ev.clientY, done: false };
+    handle.setPointerCapture(ev.pointerId);
   });
-  handle.addEventListener('pointerup', (ev) => {
-    if (!swipe) return;
+  // The sheet moves as soon as the finger has clearly gone up or down, without waiting for it to lift.
+  handle.addEventListener('pointermove', (ev) => {
+    if (!swipe || swipe.done) return;
     const dy = ev.clientY - swipe.y;
-    if (Math.abs(dy) > 24) {
+    if (Math.abs(dy) > 14) {
       sheet(dy < 0);
       swipe.done = true;
     }
+  });
+  handle.addEventListener('pointercancel', () => {
+    swipe = null;
   });
   handle.addEventListener('click', () => {
     if (!swipe || !swipe.done) sheet(!board.classList.contains('is-open'));
@@ -312,7 +319,7 @@ async function boot() {
   pins.set('landmarks', pinned(LANDMARKS));
   pins.set('wrecks', [
     ...pinned(HISTORIC_WRECKS),
-    ...chart.wrecks.map((w) => ({ ...chartedWreck(w), at: { x: w[0], y: w[1] }, x: w[0], y: w[1], label: 'Charted wreck' })).filter((w) => inMap(w)),
+    ...chart.wrecks.map((w) => { const c = chartedWreck(w); return { ...c, at: { x: w[0], y: w[1] }, x: w[0], y: w[1], label: c.title, minor: true }; }).filter((w) => inMap(w)),
   ]);
 
   const drawDolphins = () => {
@@ -321,8 +328,8 @@ async function boot() {
       const at = place(o.lat, o.lon);
       const when = o.on ? clockSmart(Date.parse(`${o.on}T12:00:00-05:00`)).split(',').slice(0, 2).join(',') : 'date not given';
       return {
-        x: at.x, y: at.y, at, label: `Dolphin sighting, ${when}`,
-        title: o.species || 'Bottlenose dolphin',
+        x: at.x, y: at.y, at, label: `Bottlenose dolphin sighting, ${when}`,
+        title: 'Bottlenose dolphin sighting',
         sub: `Seen ${when}${o.place ? `, ${o.place}` : ''}`,
         text: ['Dolphins live in the harbor all year. They work the tide lines along the channel and follow the shrimp boats into Shem Creek.'],
         note: `Reported on iNaturalist${o.by ? ` by ${o.by}` : ''}${o.license ? ` (${o.license.toUpperCase()})` : ''}.`,

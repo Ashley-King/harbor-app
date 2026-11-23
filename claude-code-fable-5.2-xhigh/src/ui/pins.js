@@ -14,7 +14,7 @@ const ICONS = {
   dolphins: '<path d="M6.5 14.5c1.5-5 5-8.5 9.5-9-1.8 2.6-1.6 6 .8 9z" fill="#fff"/><path d="M4 17.5c1.4-1.3 2.7-1.3 4 0s2.7 1.3 4 0 2.7-1.3 4 0 2.7 1.3 4 0" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>',
 };
 
-const ARROW = '<svg class="arrow" viewBox="-14 -14 28 28" aria-hidden="true"><g><path d="M0-12l6.5 9h-4v14h-5v-14h-4z"/></g></svg>';
+const ARROW = '<svg class="arrow" viewBox="-14 -14 28 28" aria-hidden="true"><g><path d="M0-12l5 7.5h-3.2v15.5h-3.6v-15.5h-5z"/></g></svg>';
 
 export class Pins {
   /** onOpen(item) is called when a pin is chosen. */
@@ -22,9 +22,11 @@ export class Pins {
     this.el = container;
     this.stage = stage;
     this.layers = new Map();
+    // A drag or pinch that starts on a pin moves the map like any other.
+    stage.adopt(container);
     container.addEventListener('click', (ev) => {
       const node = ev.target.closest('.pin');
-      if (!node) return;
+      if (!node || performance.now() - stage.gestureEndedAt < 350) return;
       const layer = this.layers.get(node.dataset.layer);
       const item = layer && layer.items[Number(node.dataset.i)];
       if (item) onOpen(item);
@@ -46,7 +48,8 @@ export class Pins {
     layer.nodes = items.map((item, i) => {
       const node = document.createElement('button');
       node.type = 'button';
-      node.className = `pin k-${id}`;
+      // A minor pin is drawn smaller: an unnamed wreck beside the ones with a story.
+      node.className = `pin k-${id}${item.minor ? ' is-minor' : ''}`;
       node.dataset.layer = id;
       node.dataset.i = String(i);
       node.setAttribute('aria-label', item.label);
@@ -54,7 +57,7 @@ export class Pins {
       if (id === 'currents') {
         node.innerHTML = `${ARROW}<span class="tag">${esc(item.tag)}</span>`;
         // The arrow points the way the water is going and grows with its speed.
-        const scale = item.kn < 0.15 ? 0.45 : Math.min(1.25, 0.6 + item.kn * 0.25);
+        const scale = item.kn < 0.15 ? 0.5 : Math.min(1, 0.6 + item.kn * 0.16);
         node.querySelector('g').setAttribute('transform', `rotate(${Math.round(item.deg)}) scale(${scale.toFixed(2)})`);
         node.classList.toggle('is-slack', item.kn < 0.15);
       } else {

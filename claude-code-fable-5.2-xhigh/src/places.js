@@ -1,4 +1,5 @@
 // Places worth a pin: landmarks round the harbor and the wrecks with a known story.
+// The stories are well known history. Wreck positions are approximate.
 // Positions are [latitude, longitude]. The charted wrecks without a name come from
 // the NOAA chart data in public/data/chart.json instead.
 
@@ -89,7 +90,45 @@ export const HISTORIC_WRECKS = [
     text: ['The iron steamer Georgiana was run aground and scuttled here on her maiden voyage in March 1863, with a cargo for the Confederacy still aboard. A year later the blockade runner Mary Bowers hit the wreck and sank on top of it. Two wrecks are still charted on this spot.'],
     links: [wiki('SS Georgiana')],
   },
+  {
+    title: 'USS Keokuk', at: [32.694, -79.868], sub: 'Sunk April 8, 1863. Position approximate',
+    text: ['An experimental Union ironclad with two fixed gun towers. In the attack on Fort Sumter on April 7, 1863 she was hit about 90 times, and she sank off Morris Island the next morning. Confederate crews worked at night to lift her two 11-inch guns out of the wreck. One of them stands at the Battery today.'],
+    links: [wiki('USS Keokuk (1862)')],
+  },
+  {
+    title: 'USS Weehawken', at: [32.717, -79.858], sub: 'Sunk December 6, 1863. Position approximate',
+    text: ['A Union monitor that had fought through the 1863 attacks on the harbor forts. She went down at her anchor off Morris Island in a gale, when water came in forward faster than the pumps could clear it. About 30 of her crew were lost.'],
+    links: [wiki('USS Weehawken (1862)')],
+  },
+  {
+    title: 'The Stone Fleet', at: [32.69, -79.835], sub: 'Sunk December 1861. Position approximate',
+    text: ['Sixteen worn-out whaling ships from New England, bought by the Union navy, filled with granite and sunk in rows across the main ship channel to close the port. It did not work. The tide scoured new channels round the hulks within months, and the ships broke up. Herman Melville wrote a poem about them.'],
+    links: [wiki('Stone Fleet')],
+  },
+  {
+    title: 'Minho and Presto', at: [32.7572, -79.8505], sub: 'Blockade runners, 1862 and 1864. Position approximate',
+    text: ["The blockade runner Minho ran aground off Sullivan's Island in October 1862. In February 1864 the Presto, coming in at night, struck the Minho's wreck and stuck fast under the guns of Fort Moultrie, where Union batteries shot her to pieces over the next days."],
+    links: [wiki('Blockade runners of the American Civil War')],
+  },
+  {
+    title: 'Stonewall Jackson', at: [32.781, -79.793], sub: 'Blockade runner, April 1863. Position approximate',
+    text: ['A blockade runner chased and hit by Union ships as she tried to slip in at night. Her captain ran her onto the beach at what is now the Isle of Palms and set her on fire. The remains are thought to lie under the sand of the beach itself.'],
+    links: [wiki('Blockade runners of the American Civil War')],
+  },
+  {
+    title: 'Constance', at: [32.781, -79.752], sub: 'Blockade runner, October 1864. Position approximate',
+    text: ['A fast Clyde-built steamer on her way in from Halifax. She struck a sunken wreck in the dark, most likely the Georgiana and Mary Bowers a little to the west, and went down in shallow water off the Isle of Palms.'],
+    links: [wiki('Blockade runners of the American Civil War')],
+  },
 ];
+
+// The chart gives no names, so an unnamed wreck is titled by what the chart does say about it.
+const WRECK_TITLE = {
+  h: 'Wreck with its hull above water',
+  m: 'Wreck with its masts above water',
+  d: 'Sunken wreck, a danger to boats',
+  n: 'Sunken wreck in deeper water',
+};
 
 const WRECK_KIND = {
   h: 'Part of the hull shows above the water.',
@@ -102,10 +141,10 @@ const WRECK_KIND = {
 export function chartedWreck(w) {
   const depth = w[3] != null ? `The least depth over it is ${w[3].toFixed(1)} m (${Math.round(w[3] / 0.3048)} ft).` : null;
   return {
-    title: 'Charted wreck',
-    sub: w[4] ? `On the NOAA chart since at least ${w[4]}` : 'From the NOAA chart',
+    title: WRECK_TITLE[w[2]] || WRECK_TITLE.d,
+    sub: w[4] ? `Unnamed. On the NOAA chart since at least ${w[4]}` : 'Unnamed. From the NOAA chart',
     text: [[WRECK_KIND[w[2]] || WRECK_KIND.d, depth].filter(Boolean).join(' ')],
-    note: 'The chart gives no name for this wreck. Not for navigation.',
+    note: 'NOAA charts record where a wreck is and how deep, but not which vessel it was. The wrecks with a known story have their own pins. Not for navigation.',
     links: [{ href: 'https://nauticalcharts.noaa.gov/data/wrecks-and-obstructions.html', text: 'NOAA wrecks and obstructions' }],
   };
 }

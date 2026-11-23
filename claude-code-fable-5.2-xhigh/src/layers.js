@@ -10,15 +10,16 @@ export const LAYERS = [
   { id: 'aids', group: 'On the map', label: 'Buoys and beacons', hint: 'With their real flash patterns at night', on: true },
   { id: 'currents', group: 'On the map', label: 'Tidal currents', hint: 'Predicted flow at eight points along the channel', on: true },
   { id: 'landmarks', group: 'On the map', label: 'Landmarks', hint: 'Forts, the Yorktown, the lighthouse', on: true },
-  { id: 'wrecks', group: 'On the map', label: 'Shipwrecks', hint: 'Charted wrecks and four with a story', on: false },
-  { id: 'dolphins', group: 'On the map', label: 'Dolphin sightings', hint: 'Reported on iNaturalist in the last 90 days', on: false },
+  { id: 'wrecks', group: 'On the map', label: 'Shipwrecks', hint: 'Named wrecks with their stories, and the rest of the chart', on: true },
+  { id: 'dolphins', group: 'On the map', label: 'Dolphin sightings', hint: 'Reported on iNaturalist in the last 90 days', on: true },
   { id: 'weather', group: 'On the board', label: 'Weather and water', hint: 'Wind, temperatures and pressure', on: true },
   { id: 'alerts', group: 'On the board', label: 'Marine alerts and forecast', on: true },
   { id: 'inbound', group: 'On the board', label: 'Ships arriving from sea', on: true },
   { id: 'log', group: 'On the board', label: 'Harbor log', hint: 'Arrivals, departures and the biggest ship', on: true },
 ];
 
-const STORE = 'harbor-layers';
+// The name changes when the defaults do, so an old saved choice does not hide a new default.
+const STORE = 'harbor-layers-2';
 
 export class Layers {
   /** `panel` is the element to fill, `button` opens and closes it. */

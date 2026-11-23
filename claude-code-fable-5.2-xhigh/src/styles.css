@@ -428,6 +428,7 @@ details.group > summary h2 { justify-content: flex-start; }
   border-radius: 50%;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.55);
   pointer-events: auto;
+  touch-action: none;
   cursor: pointer;
   will-change: transform;
 }
@@ -436,16 +437,18 @@ details.group > summary h2 { justify-content: flex-start; }
 .pin.k-landmarks { background: #b8741a; }
 .pin.k-wrecks { background: #8a2f2a; }
 .pin.k-dolphins { background: #12808c; }
+.pin.is-minor { width: 1.05rem; height: 1.05rem; margin: -0.525rem 0 0 -0.525rem; border-width: 1px; opacity: 0.85; z-index: 0; }
+.pin.is-minor::after { inset: -0.6rem; }
 .pin:hover { border-color: var(--accent); }
 /* A finger needs a bigger target than the picture. */
 .pin::after { content: ''; position: absolute; inset: -0.5rem; }
 
-.pin.k-currents { width: 2.6rem; height: 2.6rem; margin: -1.3rem 0 0 -1.3rem; border: 0; border-radius: 0; background: none; box-shadow: none; }
+.pin.k-currents { width: 1.5rem; height: 1.5rem; margin: -0.75rem 0 0 -0.75rem; border: 0; border-radius: 0; background: none; box-shadow: none; opacity: 0.85; }
 /* An arrow never takes a tap meant for a landmark or wreck beside it. */
 .pin.k-landmarks, .pin.k-wrecks, .pin.k-dolphins { z-index: 1; }
-.pin.k-currents::after { inset: 0; }
-.pin.k-currents .arrow { overflow: visible; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7)); }
-.pin.k-currents .arrow path { fill: #6fd3ff; stroke: #06283d; stroke-width: 1.4; stroke-linejoin: round; }
+.pin.k-currents::after { inset: -0.4rem; }
+.pin.k-currents .arrow { overflow: visible; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6)); }
+.pin.k-currents .arrow path { fill: #8fdcff; stroke: #06283d; stroke-width: 1.2; stroke-linejoin: round; }
 .pin.k-currents.is-slack .arrow path { fill: #e8f4fb; }
 .pin.k-currents .tag {
   position: absolute;

@@ -34,6 +34,7 @@ export class Stage {
     this.width = 1;
     this.height = 1;
     this.dpr = 1;
+    this.gestureEndedAt = 0;        // when the last drag or pinch ended, so a pin can ignore the click after it
     this.minHeight = 240;
     this.maxHeight = 30000;
     this.userMoved = false;
@@ -200,39 +201,53 @@ export class Stage {
       const r = c.getBoundingClientRect();
       return { x: e.clientX - r.left, y: e.clientY - r.top };
     };
-    c.addEventListener('pointerdown', (e) => {
+    // A finger wobbles more than a mouse, so a tap is allowed more travel.
+    const slop = (e) => (e.pointerType === 'mouse' ? 4 : 10);
+    // `overlay` is true for a touch that lands on a pin laid over the map. It still
+    // pans and pinches the map, and only a clean tap is left to the pin.
+    const down = (e, overlay) => {
       if (e.button !== 0 && e.pointerType === 'mouse') return;
-      c.setPointerCapture(e.pointerId);
+      if (!overlay) c.setPointerCapture(e.pointerId);
       const p = local(e);
       this._pointers.set(e.pointerId, p);
       this.fly = null;
       this.velocity.x = this.velocity.y = 0;
-      if (this._pointers.size === 1) this._drag = { start: p, last: p, moved: 0, time: performance.now() };
-      else this._pinch = null;
-    });
-    c.addEventListener('pointermove', (e) => {
+      if (this._pointers.size === 1) this._drag = { start: p, last: p, moved: 0, time: performance.now(), overlay };
+      else {
+        this._pinch = null;
+        // The second finger makes it a pinch, wherever the first one landed.
+        for (const id of this._pointers.keys()) if (!c.hasPointerCapture(id)) try { c.setPointerCapture(id); } catch { /* the pointer is already gone */ }
+      }
+    };
+    const move = (e) => {
       const p = local(e);
       if (!this._pointers.has(e.pointerId)) {
-        this.onHover?.(p.x, p.y);
+        if (e.target === c) this.onHover?.(p.x, p.y);
         return;
       }
       const prev = this._pointers.get(e.pointerId);
+      if (prev.x === p.x && prev.y === p.y) return;
       this._pointers.set(e.pointerId, p);
       if (this._pointers.size === 1 && this._drag) {
+        const d = this._drag;
         const dx = p.x - prev.x;
         const dy = p.y - prev.y;
-        this._drag.moved += Math.abs(dx) + Math.abs(dy);
+        const was = d.moved;
+        d.moved += Math.abs(dx) + Math.abs(dy);
+        // Nothing moves until the finger has clearly left the spot, so a tap stays a tap.
+        if (d.moved <= slop(e)) return;
+        if (was <= slop(e) && !c.hasPointerCapture(e.pointerId)) try { c.setPointerCapture(e.pointerId); } catch { /* gone */ }
         const m = this.target.h / this.height;
         this.target.x -= dx * m;
         this.target.y += dy * m;
         this.center.x = this.target.x;
         this.center.y = this.target.y;
         const now = performance.now();
-        const dt = Math.max(1, now - this._drag.time) / 1000;
+        const dt = Math.max(1, now - d.time) / 1000;
         this.velocity.x = this.velocity.x * 0.5 + ((-dx * m) / dt) * 0.5;
         this.velocity.y = this.velocity.y * 0.5 + ((dy * m) / dt) * 0.5;
-        this._drag.time = now;
-        if (this._drag.moved > 4) this.userMoved = true;
+        d.time = now;
+        this.userMoved = true;
       } else if (this._pointers.size === 2) {
         const [a, b] = [...this._pointers.values()];
         const dist = Math.hypot(a.x - b.x, a.y - b.y);
@@ -242,28 +257,48 @@ export class Stage {
           const m = this.target.h / this.height;
           this.target.x -= (mid.x - this._pinch.mid.x) * m;
           this.target.y += (mid.y - this._pinch.mid.y) * m;
+          // The map stays under the fingers: no easing while they are down.
+          this._clampTarget();
+          this.center.x = this.target.x;
+          this.center.y = this.target.y;
+          this.viewHeight = this.target.h;
         }
         this._pinch = { dist, mid };
         if (this._drag) this._drag.moved = 99;
       }
-    });
+    };
     const end = (e) => {
       if (!this._pointers.has(e.pointerId)) return;
       const p = local(e);
       this._pointers.delete(e.pointerId);
+      if (this._pinch) {
+        // Lifting one finger of a pinch must not fling the map.
+        this.velocity.x = this.velocity.y = 0;
+        if (this._drag) this._drag.time = 0;
+      }
       this._pinch = null;
       if (this._drag && this._pointers.size === 0) {
         const d = this._drag;
         this._drag = null;
         if (performance.now() - d.time > 120) this.velocity.x = this.velocity.y = 0;
-        if (d.moved <= 4 && e.type === 'pointerup') {
+        if (d.moved > slop(e)) this.gestureEndedAt = performance.now();
+        else if (e.type === 'pointerup') {
           this.velocity.x = this.velocity.y = 0;
-          this.onPick?.(p.x, p.y);
+          if (!d.overlay) this.onPick?.(p.x, p.y);
         }
       }
     };
+    c.addEventListener('pointerdown', (e) => down(e, false));
+    c.addEventListener('pointermove', move);
     c.addEventListener('pointerup', end);
     c.addEventListener('pointercancel', end);
+    // A touch keeps sending its events to the pin it landed on, so they are heard there too.
+    this.adopt = (el) => {
+      el.addEventListener('pointerdown', (e) => down(e, true));
+      el.addEventListener('pointermove', move);
+      el.addEventListener('pointerup', end);
+      el.addEventListener('pointercancel', end);
+    };
     c.addEventListener('pointerleave', () => this.onHover?.(-1, -1));
     c.addEventListener('wheel', (e) => {
       e.preventDefault();

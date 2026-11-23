@@ -16,13 +16,13 @@ An overhead view of the large ships in Charleston Harbor, South Carolina, drawn 
 - A side panel with the ships at each container terminal, ships under way, other berths, the tide at Charleston and the clearance under the Ravenel Bridge.
 - Select a ship for a small card: name, speed, kind and flag, then plain facts worked out from its report. Where it is bound, how far that is by sea and how long it would take. How much water is under its keel right now. How long it is next to a football field, the Ravenel Bridge and the Yorktown. "More details" adds the full report, a plan drawing, and the ship's backstory with a photo when Wikidata has one. A missing field reads "unknown".
 - The card never covers the ship. On a desktop it sits in a corner and the map centres the ship in the open part. On a phone the map fills the screen, the card is a short sheet at the bottom, and the ship is centred above it.
-- A Layers button switches each thing on or off, and the browser remembers the choice: ship names, small craft, the shipping channel, buoys and beacons, tidal currents, landmarks, shipwrecks, dolphin sightings, and on the board the weather, marine alerts, ships arriving from sea and the harbor log.
+- A Layers button switches each thing on or off. Everything starts on, and the browser remembers the choice: ship names, small craft, the shipping channel, buoys and beacons, tidal currents, landmarks, shipwrecks, dolphin sightings, and on the board the weather, marine alerts, ships arriving from sea and the harbor log.
 - Buoys and beacons from the NOAA chart, modelled at real size. At night each light flashes its charted colour and rhythm, and the Sullivan's Island lighthouse shows its two flashes every 30 seconds.
 - Wind, water and air temperature and pressure at the Charleston tide station, and arrows for the predicted tidal current at eight points along the channel.
 - The National Weather Service marine forecast for the harbor, with any active advisory shown on the board and as a chip on the map.
 - Ships arriving from sea: large ships outside the jetties that are heading for the entrance, with distance and an estimated time at the jetties.
 - A harbor log of arrivals, departures and the biggest ship of each day, kept for a week.
-- Pins for 12 landmarks, 4 wrecks with a story (the Housatonic, the Hunley, the Patapsco, the Georgiana) and every wreck on the NOAA chart, and recent dolphin sightings from iNaturalist.
+- Pins for 12 landmarks, 10 wrecks with a story (the Housatonic, the Hunley, the Keokuk, the Stone Fleet, blockade runners and more) and every wreck on the NOAA chart, and recent dolphin sightings from iNaturalist.
 
 ## Run it locally
 
@@ -110,7 +110,7 @@ The files under `public/data` are built from those sources by the scripts in `to
 - Distance to a destination is a rough sea route through a few turning points (round Florida, through Panama, Gibraltar, Suez or Malacca), not a routed voyage. Travel time uses the ship's speed now, or 16 knots when it is not moving. A destination the crew typed in a form the port table does not know is shown as typed.
 - Ships arriving from sea are only those the AIS network can hear, which is roughly 20 to 40 nautical miles out. The time at the jetties is distance over speed now.
 - The harbor log starts empty and sees the harbor once every 10 minutes, so a ship that comes and goes inside 10 minutes is missed. On Vercel there is no log, because nothing there keeps it.
-- Positions of the four historic wrecks are approximate. Charted wrecks come from the NOAA chart with no names. Dolphin sightings are what people chose to report, at the accuracy they reported.
+- Positions of the ten historic wrecks are approximate. Charted wrecks come from the NOAA chart, which records no names, so those pins say only what the chart knows. Dolphin sightings are what people chose to report, at the accuracy they reported.
 - A ship has a backstory only if Wikidata has an entry with its IMO number. Most do not.
 - Not for navigation.
 
