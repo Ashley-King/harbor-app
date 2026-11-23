@@ -114,6 +114,10 @@ The files under `public/data` are built from those sources by the scripts in `to
 - A ship has a backstory only if Wikidata has an entry with its IMO number. Most do not.
 - Not for navigation.
 
+## Search and sharing
+
+The page has a title, description, canonical address, Open Graph and Twitter card tags (with `public/og-image.jpg`), and JSON-LD describing the site as a WebSite and WebApplication made by Ashley (https://ashleyk.dev). `robots.txt` allows everything except `/api/` and points to `sitemap.xml`. `llms.txt` describes the site for AI assistants. All of it fits the existing content security policy: the JSON-LD block is data, not a script that runs.
+
 ## Layout
 
 ```
@@ -136,6 +140,7 @@ src/places.js        landmarks and wreck stories
 src/astro.js         sun and moon
 public/data/         imagery mosaic, water mask, lights, harbor features
 public/hires/        sharp close-up imagery tiles for the port areas
+public/              also llms.txt, robots.txt, sitemap.xml, site.webmanifest, icons and og-image.jpg
 tools/               scripts that build public/data and public/hires
 ```
 

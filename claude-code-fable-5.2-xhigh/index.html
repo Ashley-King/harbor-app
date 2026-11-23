@@ -5,11 +5,81 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="color-scheme" content="dark light" />
     <meta name="theme-color" content="#071019" />
-    <title>Charleston Harbor, live ships</title>
-    <meta name="description" content="A live overhead view of the large ships in Charleston Harbor, South Carolina, with tide, weather, currents and Ravenel Bridge clearance." />
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23071019'/%3E%3Cpath d='M6 19h20l-3 6H9z' fill='%23f0b866'/%3E%3Cpath d='M11 18v-6h4v6zm5 0V9h4v9z' fill='%23dbe6ee'/%3E%3C/svg%3E" />
+    <title>Charleston Harbor Live Ship Map and Tide | Harbor Watch</title>
+    <meta name="description" content="Live map of the ships in Charleston Harbor, SC. See container ships, tankers, cruise ships and tugs at the port terminals in real time, with the tide and Ravenel Bridge clearance." />
+    <meta name="author" content="Ashley" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <link rel="canonical" href="https://charlestonharborwatch.com/" />
+    <link rel="author" href="https://ashleyk.dev" />
+
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Charleston Harbor Watch" />
+    <meta property="og:title" content="Charleston Harbor Live Ship Map" />
+    <meta property="og:description" content="Every large ship in Charleston Harbor, live, over aerial imagery, with the tide and Ravenel Bridge clearance." />
+    <meta property="og:url" content="https://charlestonharborwatch.com/" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:image" content="https://charlestonharborwatch.com/og-image.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Night map of Charleston Harbor with ship names at the Wando Welch Terminal, the tide and the Ravenel Bridge clearance" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Charleston Harbor Live Ship Map" />
+    <meta name="twitter:description" content="Every large ship in Charleston Harbor, live, over aerial imagery, with the tide and Ravenel Bridge clearance." />
+    <meta name="twitter:image" content="https://charlestonharborwatch.com/og-image.jpg" />
+    <meta name="twitter:image:alt" content="Night map of Charleston Harbor with ship names at the Wando Welch Terminal, the tide and the Ravenel Bridge clearance" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Person",
+            "@id": "https://ashleyk.dev/#person",
+            "name": "Ashley",
+            "url": "https://ashleyk.dev"
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://charlestonharborwatch.com/#website",
+            "name": "Charleston Harbor Watch",
+            "url": "https://charlestonharborwatch.com/",
+            "inLanguage": "en-US",
+            "creator": { "@id": "https://ashleyk.dev/#person" }
+          },
+          {
+            "@type": "WebApplication",
+            "@id": "https://charlestonharborwatch.com/#app",
+            "name": "Charleston Harbor Watch",
+            "url": "https://charlestonharborwatch.com/",
+            "description": "Live map of the ships in Charleston Harbor, South Carolina, with the tide at Charleston and the clearance under the Ravenel Bridge.",
+            "applicationCategory": "TravelApplication",
+            "operatingSystem": "Any",
+            "browserRequirements": "Requires JavaScript and WebGL",
+            "image": "https://charlestonharborwatch.com/og-image.jpg",
+            "isAccessibleForFree": true,
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+            "creator": { "@id": "https://ashleyk.dev/#person" },
+            "isPartOf": { "@id": "https://charlestonharborwatch.com/#website" },
+            "spatialCoverage": {
+              "@type": "Place",
+              "name": "Charleston Harbor, South Carolina",
+              "geo": { "@type": "GeoCoordinates", "latitude": 32.78, "longitude": -79.92 }
+            }
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
+    <noscript>
+      <p>Charleston Harbor Watch is a live map of the ships in Charleston Harbor, South Carolina, with the tide and the Ravenel Bridge clearance. It needs JavaScript and WebGL.</p>
+    </noscript>
     <div id="app">
       <aside id="board" aria-label="Harbor board">
         <button type="button" id="sheet-handle" class="sheet-handle" aria-expanded="false" aria-controls="board-body">
@@ -53,6 +123,7 @@
           <footer class="board-foot">
             <div id="status" class="status" role="status" aria-live="polite"></div>
             <p class="credits" id="credits"></p>
+            <p class="credits">Made by <a href="https://ashleyk.dev" rel="author">Ashley</a></p>
           </footer>
         </div>
       </aside>
