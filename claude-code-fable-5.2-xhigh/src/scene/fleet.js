@@ -722,6 +722,13 @@ export class Fleet {
     mesh.receiveShadow = true;
     const object = new THREE.Group();
     object.add(mesh);
+    // Masts and other thin spars: drawn, lit and shaded like the rest, but they throw no shadow.
+    let spars = null;
+    if (built.spars) {
+      spars = new THREE.Mesh(built.spars, material);
+      spars.receiveShadow = true;
+      object.add(spars);
+    }
     const kelvin = new THREE.Mesh(this.kelvinGeometry, new THREE.ShaderMaterial({
       vertexShader: KELVIN_VERT, fragmentShader: KELVIN_FRAG, transparent: true, depthWrite: false,
       uniforms: { ...this.wakeUniforms, uLen: { value: L }, uBeam: { value: B }, uSpeed: { value: 0 }, uExtent: { value: new THREE.Vector3(-L * 3.1, L * 0.5, L * 2.6 + B) } },
@@ -733,6 +740,7 @@ export class Fleet {
     this.group.add(object);
     e.object = object;
     e.mesh = mesh;
+    e.spars = spars;
     e.kelvin = kelvin;
     e.built = built;
     e.builtKey = e.model.key;
@@ -742,6 +750,8 @@ export class Fleet {
     if (e.object) {
       this.group.remove(e.object);
       e.mesh.geometry.dispose();
+      if (e.spars) e.spars.geometry.dispose();
+      e.spars = null;
       e.mesh.material.dispose();
       e.kelvin.material.dispose();
       e.object = null;

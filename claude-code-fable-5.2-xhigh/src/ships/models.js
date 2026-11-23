@@ -19,6 +19,11 @@ const DECK_GREY = 0x6b7074;
 
 const pick = (rand, arr) => arr[Math.floor(rand() * arr.length)];
 
+// Masts, outriggers, a dredge's crane boom and its legs go into a second geometry,
+// `spars`. They are drawn like the rest of the vessel but cast no shadow: a mast is
+// tens of metres tall and a hand's width across, and its shadow reads as a stray
+// black line over the water.
+
 function hull(b, outline, freeboard, side, deck) {
   b.prism(outline, -1.5, 1.1, BOOT, BOOT, { noTop: true });
   b.prism(outline, 1.1, freeboard, side, deck);
@@ -638,13 +643,14 @@ export function sailboat(L, B, rand) {
   b.cyl(-L * 0.3, 0, D + 0.06, D + 0.9, 0.09, STEEL, { seg: 6 });
   b.on(-L * 0.3, 0, D + 0.85, 0.08, 0.5, 0.75, STEEL);
   // mast, boom and furled mainsail under its cover
+  const sp = new Builder();
   const mx = L * 0.14, mastH = L * 1.15;
-  b.cyl(mx, 0, D + 0.5, D + mastH, 0.085 + L * 0.004, 0xc9cdd0, { seg: 6 });
+  sp.cyl(mx, 0, D + 0.5, D + mastH, 0.085 + L * 0.004, 0xc9cdd0, { seg: 6 });
   b.on(mx - L * 0.19, 0, D + 1.7, L * 0.38, 0.14, 0.14, 0xc9cdd0);
   b.on(mx - L * 0.19, 0, D + 1.84, L * 0.36, 0.34, 0.36, cover);
   if (L > 17) {
     // ketch: a second, shorter mast aft
-    b.cyl(-L * 0.34, 0, D, D + mastH * 0.62, 0.07 + L * 0.003, 0xc9cdd0, { seg: 6 });
+    sp.cyl(-L * 0.34, 0, D, D + mastH * 0.62, 0.07 + L * 0.003, 0xc9cdd0, { seg: 6 });
     b.on(-L * 0.42, 0, D + 1.6, L * 0.16, 0.3, 0.3, cover);
   }
   // furled headsail on the forestay, bow pulpit, stern rail
@@ -655,7 +661,7 @@ export function sailboat(L, B, rand) {
     masthead: [mx, D + mastH, 0], masthead2: null,
     port: [L * 0.44, D + 0.5, -B * 0.1], stbd: [L * 0.44, D + 0.5, B * 0.1], stern: [-L * 0.49, D + 0.6, 0],
   };
-  return { geometry: b.build(), height: D + mastH, lights, work: [] };
+  return { geometry: b.build(), spars: sp.build(), height: D + mastH, lights, work: [] };
 }
 
 /** Open motor boat: centre console with a T-top, bench seats, outboards. */
@@ -743,13 +749,14 @@ export function fishingBoat(L, B, rand) {
   b.on(hx + hl / 2 + 0.02, 0, D + 1.2, 0.06, 0.8, hw * 0.85, WINDOW, { glow: 0.5 });
   for (const s of [-1, 1]) b.on(hx, s * (hw / 2 + 0.02), D + 1.2, hl * 0.7, 0.75, 0.05, WINDOW, { glow: 0.5 });
   // mast with the outriggers swung out, as they are carried when working or drying nets
+  const sp = new Builder();
   const mx = hx - hl / 2 - 0.6;
-  b.cyl(mx, 0, D, D + L * 0.42, 0.14, 0x6b6f72, { seg: 6 });
+  sp.cyl(mx, 0, D, D + L * 0.42, 0.14, 0x6b6f72, { seg: 6 });
   for (const s of [-1, 1]) {
-    b.on(mx, s * L * 0.19, D + L * 0.2, 0.2, 0.2, L * 0.42, 0x6b6f72, { yaw: 0, pitch: 0 });
+    sp.on(mx, s * L * 0.19, D + L * 0.2, 0.2, 0.2, L * 0.42, 0x6b6f72, { yaw: 0, pitch: 0 });
     b.on(mx - 0.4, s * L * 0.36, D + L * 0.2 - 0.6, 0.9, 0.9, 0.9, 0x2f6b4a);                     // trawl door or net float
   }
-  b.on(mx - L * 0.05, 0, D + L * 0.3, L * 0.3, 0.16, 0.16, 0x6b6f72, { pitch: 0.35 });            // boom aft
+  sp.on(mx - L * 0.05, 0, D + L * 0.3, L * 0.3, 0.16, 0.16, 0x6b6f72, { pitch: 0.35 });           // boom aft
   // work deck: winch, hold hatch, piled net
   b.on(-L * 0.08, 0, D, 1.6, 1.0, B * 0.36, 0x35393c);
   b.on(-L * 0.24, 0, D, L * 0.12, 0.3, B * 0.34, 0x9aa0a4);
@@ -758,7 +765,7 @@ export function fishingBoat(L, B, rand) {
     masthead: [mx, D + L * 0.42, 0], masthead2: null,
     port: [hx, D + 2.4, -hw / 2], stbd: [hx, D + 2.4, hw / 2], stern: [-L * 0.5 + 0.3, D + 0.8, 0],
   };
-  return { geometry: b.build(), height: D + L * 0.45, lights, work: [[-L * 0.25, D + 3, 0, B * 0.8]] };
+  return { geometry: b.build(), spars: sp.build(), height: D + L * 0.45, lights, work: [[-L * 0.25, D + 3, 0, B * 0.8]] };
 }
 
 /** Patrol craft: navy grey, police blue, or Coast Guard with an orange collar or stripe. */
@@ -841,9 +848,11 @@ export function dredge(L, B, rand) {
   // crane with its boom reaching over the bow
   b.cyl(L * 0.16, 0, D, D + 3, Math.min(2.6, B * 0.16), 0xd8b93a, { seg: 10 });
   b.on(L * 0.16, 0, D + 3, Math.min(6, L * 0.12), 2.6, Math.min(4.5, B * 0.3), 0xd8b93a, { top: 0xc4a52f });
-  b.on(L * 0.16 + L * 0.2, 0, D + 9, L * 0.44, 0.9, 1.1, 0xd8b93a, { pitch: 0.28 });
-  // spuds: the legs that pin the dredge to the bottom
-  for (const s of [-1, 1]) b.cyl(-L * 0.46, s * B * 0.38, D - 0.5, D + Math.max(12, L * 0.3), 0.55, 0x4b5257, { seg: 8 });
+  const sp = new Builder();
+  sp.on(L * 0.16 + L * 0.2, 0, D + 9, L * 0.44, 0.9, 1.1, 0xd8b93a, { pitch: 0.28 });
+  // spuds: the legs that pin the dredge to the bottom. Most of each is under water.
+  const spud = clamp(L * 0.12, 8, 15);
+  for (const s of [-1, 1]) sp.cyl(-L * 0.46, s * B * 0.38, D - 0.5, D + spud, 0.55, 0x4b5257, { seg: 8 });
   // discharge pipe along one side
   b.on(-L * 0.05, -B * 0.42, D + 0.4, L * 0.8, 0.8, 0.8, 0x55595c);
   for (let i = 0; i < 4; i++) b.on(L * (0.02 + i * 0.09), B * 0.36, D, 2.2, 1.4, 2.2, 0x35393c);
@@ -851,7 +860,7 @@ export function dredge(L, B, rand) {
     masthead: [-L * 0.05, D + 7.2, B * 0.2], masthead2: null,
     port: [L * 0.45, D + 1.5, -B * 0.45], stbd: [L * 0.45, D + 1.5, B * 0.45], stern: [-L * 0.49, D + 1.5, 0],
   };
-  return { geometry: b.build(), height: D + Math.max(13, L * 0.3), lights, work: [[L * 0.1, D + 8, 0, B * 0.7], [-L * 0.2, D + 6, 0, B * 0.6]] };
+  return { geometry: b.build(), spars: sp.build(), height: D + Math.max(13, spud + 1), lights, work: [[L * 0.1, D + 8, 0, B * 0.7], [-L * 0.2, D + 6, 0, B * 0.6]] };
 }
 
 export const MODELS = {
