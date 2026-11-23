@@ -20,3 +20,28 @@
 
 /data/*
   Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+
+/og-image.jpg
+  Cache-Control: public, max-age=86400
+
+/favicon.*
+  Cache-Control: public, max-age=86400
+
+/icon-*
+  Cache-Control: public, max-age=86400
+
+/apple-touch-icon.png
+  Cache-Control: public, max-age=86400
+
+/site.webmanifest
+  Cache-Control: public, max-age=86400
+
+# Crawler files: short cache so edits show up quickly.
+/robots.txt
+  Cache-Control: public, max-age=3600
+
+/sitemap.xml
+  Cache-Control: public, max-age=3600
+
+/llms.txt
+  Cache-Control: public, max-age=3600

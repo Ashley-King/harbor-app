@@ -1,0 +1,33 @@
+# Charleston Harbor Watch
+
+> A free, live overhead map of the ships in Charleston Harbor, South Carolina. It shows every large vessel at its real AIS position as a 3D model over USGS aerial imagery, with the live tide at Charleston and the live clearance under the Ravenel Bridge. Made by Ashley (https://ashleyk.dev).
+
+Site: https://charlestonharborwatch.com/
+
+The page shows:
+
+- Container ships, tankers, car carriers, bulk carriers, cruise ships, tugs, pilot boats and small craft at their live AIS positions, scaled to their reported size and turned to their heading.
+- Ships at each container terminal: Wando Welch, Leatherman, North Charleston and Columbus Street.
+- Ships under way, moving along the track they actually reported.
+- The water level and tide predictions at Charleston (NOAA CO-OPS station 8665530).
+- The air gap under the Arthur Ravenel Jr. Bridge (NOAA CO-OPS station 8665353).
+- A day view with real sun shadows and a night view with harbor and navigation lights, following Charleston's real sunrise and sunset.
+- A card for each ship: name, flag, IMO, type, length and beam, speed, destination, ETA, draught and last report time.
+
+Data refreshes every 10 minutes. No account or key is needed to use it. It is not for navigation.
+
+## Sources
+
+- Ship positions: Open Waters AIS
+- Tide and bridge clearance: NOAA CO-OPS
+- Aerial imagery: USGS The National Map, USDA NAIP orthophotos
+- Map features: OpenStreetMap contributors (ODbL)
+- Shipping channel: US Army Corps of Engineers, National Channel Framework
+
+## Creator
+
+- [Ashley](https://ashleyk.dev): made Charleston Harbor Watch
+
+## Optional
+
+- [Live data endpoint](https://charlestonharborwatch.com/api/harbor): JSON with the current vessels, tide and bridge clearance, used by the page

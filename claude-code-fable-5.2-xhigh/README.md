@@ -90,6 +90,10 @@ The files under `public/data` are built from those sources by the scripts in `to
 - A small craft that has no track and whose last two reports are on opposite sides of land is moved in one step, so it is never drawn sailing over land.
 - Not for navigation.
 
+## Search and sharing
+
+The page has a title, description, canonical address, Open Graph and Twitter card tags (with `public/og-image.jpg`), and JSON-LD describing the site as a WebSite and WebApplication made by Ashley (https://ashleyk.dev). `robots.txt` allows everything except `/api/` and points to `sitemap.xml`. `llms.txt` describes the site for AI assistants. All of it fits the existing content security policy: the JSON-LD block is data, not a script that runs.
+
 ## Layout
 
 ```
@@ -105,6 +109,7 @@ src/ui/              side panel, ship card, map labels
 src/astro.js         sun and moon
 public/data/         imagery mosaic, water mask, lights, harbor features
 public/hires/        sharp close-up imagery tiles for the port areas
+public/              also llms.txt, robots.txt, sitemap.xml, site.webmanifest, icons and og-image.jpg
 tools/               scripts that build public/data and public/hires
 ```
 
