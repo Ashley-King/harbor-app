@@ -17,6 +17,8 @@
   --label: #f3f7fa;
   --label-halo: rgba(3, 8, 13, 0.9);
   --water-label: #a9d3f0;
+  --label-plate: rgba(7, 16, 25, 0.9);
+  --label-plate-ink: #f6d39a;
   --shadow: 0 0.6rem 2rem rgba(0, 0, 0, 0.45);
   font-size: clamp(14px, 0.52vw + 7.2px, 30px);
 }
@@ -36,6 +38,8 @@
   --label: #ffffff;
   --label-halo: rgba(6, 22, 34, 0.85);
   --water-label: #d9efff;
+  --label-plate: rgba(255, 255, 255, 0.94);
+  --label-plate-ink: #0e2736;
   --shadow: 0 0.6rem 1.6rem rgba(10, 30, 45, 0.25);
 }
 
@@ -252,7 +256,17 @@ details.group > summary h2 { justify-content: flex-start; }
 .lbl.k-landmark { font-family: 'Barlow', sans-serif; font-weight: 500; font-size: 0.78rem; opacity: 0.92; }
 .lbl.k-ship { font-size: 0.82rem; font-weight: 600; }
 .lbl.k-ship.is-small { font-weight: 500; font-size: 0.74rem; opacity: 0.9; }
-.lbl.k-ship.is-selected { color: var(--accent); }
+.lbl.k-ship.is-selected {
+  margin: -0.16em 0 0 -0.1em;
+  padding: 0.16em 0.5em 0.2em;
+  border-radius: 0.32em;
+  border: 1px solid var(--accent);
+  background: var(--label-plate);
+  color: var(--label-plate-ink);
+  font-weight: 600;
+  opacity: 1;
+  text-shadow: none;
+}
 
 .map-top { position: absolute; top: 0.9rem; right: 0.9rem; display: flex; flex-direction: column; align-items: flex-end; gap: 0.35rem; }
 

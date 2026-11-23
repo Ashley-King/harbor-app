@@ -82,13 +82,14 @@ export class Env {
     const n = this.night * this.night * (3 - 2 * this.night);
     u.uNight.value = n;
 
-    // ---- sun: the real one when it is up, otherwise a mid-morning stand-in for manual day mode
+    // ---- sun: the real one when it is up, otherwise a late-morning stand-in for manual day mode
     const sp = sunPosition(nowMs);
     let az = sp.azimuth;
     let alt = sp.altitude;
     if (alt < 4 * D2R) {
+      // High enough that a ship's shadow stays a narrow band beside it and does not double its outline.
       az = 135 * D2R;
-      alt = 46 * D2R;
+      alt = 55 * D2R;
     }
     const altDeg = alt / D2R;
     skyDir(az, Math.max(alt, 13 * D2R), u.uSunDir.value);
@@ -131,7 +132,7 @@ export class Env {
     }
     this.sun.castShadow = n < 0.9;
     this.sun.shadow.normalBias = clamp(((half * 2) / this.sun.shadow.mapSize.x) * 1.6, 0.25, 6);
-    this.shadowPlane.material.opacity = 0.42 * (1 - n) * (0.55 + 0.45 * warm);
+    this.shadowPlane.material.opacity = 0.34 * (1 - n) * (0.55 + 0.45 * warm);
     this.shadowPlane.visible = n < 0.9;
     this.shadowPlane.position.set(c.x, 0.06, -c.y);
     this.shadowPlane.scale.set(half * 2.2, 1, half * 2.2);

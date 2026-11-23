@@ -56,7 +56,9 @@ export function buildCranes(scene, harbor, glowUniform) {
     mesh.setMatrixAt(i, m);
   });
   mesh.instanceMatrix.needsUpdate = true;
-  mesh.castShadow = true;
+  // The photo already holds the cranes' real shadows on the wharf. A second set from
+  // these models fell across the ship and the water beside it and hid the ship.
+  mesh.castShadow = false;
   mesh.receiveShadow = true;
   mesh.frustumCulled = false;
   scene.add(mesh);

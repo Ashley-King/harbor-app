@@ -25,6 +25,55 @@ const addWall = (hull, x, y) => {
   hull.walls.push({ x, y });
 };
 
+/** Outline of a model at the waterline: the convex hull of every vertex below the water, as [x, z]. */
+function footprint(geometry) {
+  const p = geometry.attributes.position;
+  const pts = [];
+  for (let i = 0; i < p.count; i++) if (p.getY(i) < 0.05) pts.push([p.getX(i), p.getZ(i)]);
+  pts.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const half = (list) => {
+    const out = [];
+    for (const q of list) {
+      while (out.length >= 2 && cross(out[out.length - 2], out[out.length - 1], q) <= 1e-9) out.pop();
+      out.push(q);
+    }
+    out.pop();
+    return out;
+  };
+  return half(pts).concat(half(pts.slice().reverse()));
+}
+
+/**
+ * A soft band on the water all round a hull, strongest at the hull and fading out
+ * over `reach` metres. It is what separates a hull from the water it sits on: dark
+ * by day, like the shade under a hull, and pale at night, like its lights on the water.
+ */
+function haloGeometry(outline, reach) {
+  const n = outline.length;
+  const pos = new Float32Array(n * 2 * 3), col = new Float32Array(n * 2 * 4), idx = [];
+  for (let i = 0; i < n; i++) {
+    const a = outline[(i + n - 1) % n], b = outline[i], c = outline[(i + 1) % n];
+    // outward direction at this corner: the two edges' normals, averaged
+    let nx = b[1] - a[1] + (c[1] - b[1]), nz = -(b[0] - a[0]) - (c[0] - b[0]);
+    const len = Math.hypot(nx, nz) || 1;
+    nx /= len;
+    nz /= len;
+    const e1 = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    const cos = Math.max(0.55, Math.abs(((b[1] - a[1]) / e1) * nx - ((b[0] - a[0]) / e1) * nz));
+    const out = reach / cos;
+    pos.set([b[0], 0.07, b[1], b[0] + nx * out, 0.07, b[1] + nz * out], i * 6);
+    col.set([1, 1, 1, 1, 1, 1, 1, 0], i * 8);
+    const j = (i + 1) % n;
+    idx.push(i * 2, i * 2 + 1, j * 2 + 1, i * 2, j * 2 + 1, j * 2);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(col, 4));
+  g.setIndex(idx);
+  return g;
+}
+
 const WAKE_VERT = /* glsl */ `
 attribute vec2 aUv;
 attribute float aAlpha;
@@ -121,6 +170,7 @@ export class Fleet {
     this.wakeUniforms = { uNoise: { value: noise }, uTime: env.uniforms.uTime, uNight: env.uniforms.uNight };
     this.wakeMaterial = new THREE.ShaderMaterial({ vertexShader: WAKE_VERT, fragmentShader: WAKE_FRAG, uniforms: this.wakeUniforms, transparent: true, depthWrite: false, side: THREE.DoubleSide });
     this.kelvinGeometry = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+    this.haloMaterial = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, side: THREE.DoubleSide });
 
     this.piers = new PierIndex(harbor.piers, harbor.pierAreas);
     this._drawn = [];
@@ -729,6 +779,13 @@ export class Fleet {
       spars.receiveShadow = true;
       object.add(spars);
     }
+    const edge = footprint(built.geometry);
+    let halo = null;
+    if (edge.length >= 3) {
+      halo = new THREE.Mesh(haloGeometry(edge, clamp(B * 0.14, 0.7, 3.2)), this.haloMaterial);
+      halo.renderOrder = 1;
+      object.add(halo);
+    }
     const kelvin = new THREE.Mesh(this.kelvinGeometry, new THREE.ShaderMaterial({
       vertexShader: KELVIN_VERT, fragmentShader: KELVIN_FRAG, transparent: true, depthWrite: false,
       uniforms: { ...this.wakeUniforms, uLen: { value: L }, uBeam: { value: B }, uSpeed: { value: 0 }, uExtent: { value: new THREE.Vector3(-L * 3.1, L * 0.5, L * 2.6 + B) } },
@@ -741,6 +798,7 @@ export class Fleet {
     e.object = object;
     e.mesh = mesh;
     e.spars = spars;
+    e.halo = halo;
     e.kelvin = kelvin;
     e.built = built;
     e.builtKey = e.model.key;
@@ -751,7 +809,8 @@ export class Fleet {
       this.group.remove(e.object);
       e.mesh.geometry.dispose();
       if (e.spars) e.spars.geometry.dispose();
-      e.spars = null;
+      if (e.halo) e.halo.geometry.dispose();
+      e.spars = e.halo = null;
       e.mesh.material.dispose();
       e.kelvin.material.dispose();
       e.object = null;
@@ -840,6 +899,8 @@ export class Fleet {
   update(dt, nowMs) {
     const night = this.env.night;
     this.glow.value = night;
+    this.haloMaterial.color.setRGB(lerp(0.0, 0.5, night), lerp(0.035, 0.62, night), lerp(0.06, 0.74, night));
+    this.haloMaterial.opacity = lerp(0.5, 0.34, night);
     const lights = this.lights;
     lights.reset();
     lights.uniforms.uStrength.value = night;
@@ -921,6 +982,7 @@ export class Fleet {
       o.position.set(cx, 0, -cy);
       o.rotation.y = Math.PI / 2 - e.heading * D2R;
       o.visible = e.fade > 0.01;
+      if (e.halo) e.halo.visible = e.fade > 0.6;
       const mat = e.mesh.material;
       const dim = e.stale ? 0.58 : 1;
       mat.color.setScalar(dim);

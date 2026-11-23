@@ -24,9 +24,41 @@ const pick = (rand, arr) => arr[Math.floor(rand() * arr.length)];
 // tens of metres tall and a hand's width across, and its shadow reads as a stray
 // black line over the water.
 
+const GUNWALE = 0xc6ccd0;
+
+/**
+ * A hull outline moved in from the edge by w metres all round. The outline runs up
+ * the starboard side from stern to bow and back down the port side (see hullOutline).
+ */
+function inset(outline, w) {
+  const n = outline.length / 2;
+  const x0 = outline[0][0], x1 = outline[n - 1][0];
+  const mid = (x0 + x1) / 2, k = (x1 - x0 - 2 * w) / (x1 - x0);
+  const side = [];
+  for (let i = 0; i < n; i++) {
+    if (outline[i][1] - w > 0.03) side.push([mid + (outline[i][0] - mid) * k, outline[i][1] - w]);
+  }
+  if (side.length < 2) return null;
+  const out = side.map((p) => [p[0], p[1]]);
+  for (let i = side.length - 1; i >= 0; i--) out.push([side[i][0], -side[i][1]]);
+  return out;
+}
+
+/**
+ * The deck of a ship seen from above: a pale strip round the edge with the deck
+ * colour inside it. From overhead the painted hull sides cannot be seen, so without
+ * the strip a dark deck melts into dark water and into the shadows of the cranes.
+ * The strip also holds a little light at night.
+ */
+function deckEdge(b, outline, y, deck, beam) {
+  const inner = inset(outline, clamp(beam * 0.03, 0.35, 1.5));
+  if (inner) b.prism(inner, y, y + 0.06, deck, deck);
+}
+
 function hull(b, outline, freeboard, side, deck) {
   b.prism(outline, -1.5, 1.1, BOOT, BOOT, { noTop: true });
-  b.prism(outline, 1.1, freeboard, side, deck);
+  b.prism(outline, 1.1, freeboard, side, GUNWALE, { topGlow: 0.14 });
+  deckEdge(b, outline, freeboard, deck, outline.halfAt(0) * 2);
 }
 
 /** Deckhouse with a full-width bridge and wings on top. Returns the bridge roof height. */
@@ -252,7 +284,8 @@ export function carCarrier(L, B, rand, info = {}) {
   if (info.grey) Object.assign(scheme, { low: 0x6f777d, up: 0x8d959b, deck: 0x7b8388 });
   b.prism(outline, -1.5, 1.1, BOOT, BOOT, { noTop: true });
   b.prism(outline, 1.1, H * 0.36, scheme.low, scheme.low, { noTop: true });
-  b.prism(outline, H * 0.36, H, scheme.up, scheme.deck);
+  b.prism(outline, H * 0.36, H, scheme.up, GUNWALE, { topGlow: 0.14 });
+  deckEdge(b, outline, H, scheme.deck, B);
   const bowX = L / 2, sternX = -L / 2;
   // weather deck: ventilator housings in two lines, lane markings
   const n = Math.round(L / 11);
@@ -571,7 +604,8 @@ export function roroShip(L, B, rand) {
   const outline = hullOutline(L, B, { bow: 0.17, bowA: 1.8, bowB: 0.75, stern: 0.05, transom: 0.92 });
   const grey = 0x7c858b;
   b.prism(outline, -1.5, 1.1, BOOT, BOOT, { noTop: true });
-  b.prism(outline, 1.1, D, grey, 0x646b70);
+  b.prism(outline, 1.1, D, grey, GUNWALE, { topGlow: 0.14 });
+  deckEdge(b, outline, D, 0x646b70, B);
   const bowX = L / 2, sternX = -L / 2;
   const houseLen = clamp(L * 0.1, 12, 22);
   const houseX = sternX + L * 0.2;
