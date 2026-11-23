@@ -188,4 +188,6 @@ To run it locally the way Cloudflare does, at http://localhost:8787:
 npm run cf:dev
 ```
 
+The site's address, `charlestonharborwatch.com` (with and without `www`), is set under `routes` in `wrangler.jsonc`. Cloudflare creates the DNS records and certificates on deploy. The domain has to be a zone on the same Cloudflare account, so anyone deploying a copy elsewhere should change or remove those two lines.
+
 No environment variables or secrets are needed. It fits the Workers Free plan: static files are served free, and only `/api/harbor` runs the Worker. That plan allows 50 outgoing calls per request, so on Cloudflare the endpoint fetches tracks for up to 32 moving vessels where Vercel fetches 40. A warm Worker shares one finished answer for 20 seconds.

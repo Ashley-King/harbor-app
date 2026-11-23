@@ -10,5 +10,13 @@
     "binding": "ASSETS",
     "run_worker_first": ["/api/*"]
   },
+  // The site's own address. Cloudflare creates the DNS records and certificates itself
+  // on deploy. The domain must be a zone on the same Cloudflare account.
+  "routes": [
+    { "pattern": "charlestonharborwatch.com", "custom_domain": true },
+    { "pattern": "www.charlestonharborwatch.com", "custom_domain": true }
+  ],
+  // Keep the workers.dev address as well, as a second way in.
+  "workers_dev": true,
   "observability": { "enabled": true }
 }
