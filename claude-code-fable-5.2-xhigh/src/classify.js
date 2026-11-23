@@ -66,6 +66,23 @@ export const HOW_TEXT = {
   size: 'estimated from the size',
 };
 
+export const FOOT = 0.3048;
+
+/**
+ * Some yacht owners key their boat's size into the transponder in feet. AIS carries
+ * the numbers as metres, so a 65 ft catamaran arrives as a 65 m one and would be drawn
+ * across half a marina. A size is read as feet only when it cannot be a real hull in
+ * metres: a sailing or pleasure craft 30 "m" or longer, with no IMO number and no
+ * draught (a yacht that big reports both), whose beam is wider than any yacht of that
+ * length is built. Everything else is drawn exactly as reported.
+ */
+export function sizeInFeet(v) {
+  if (v.type !== 36 && v.type !== 37) return false;
+  if (v.length == null || v.beam == null || v.length < 30) return false;
+  if (v.imo != null || v.draught != null) return false;
+  return v.length / v.beam < 3.3 || (v.length >= 50 && v.beam > v.length * 0.14 + 4.5);
+}
+
 /** True when the model is a stand-in because AIS gave no type to go on. */
 export const isGuess = (v, choice) => choice.how === 'size' && !(v.type >= 60 && v.type <= 89) && choice.model !== 'atb';
 

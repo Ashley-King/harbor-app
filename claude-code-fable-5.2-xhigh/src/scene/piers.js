@@ -91,3 +91,26 @@ export class PierIndex {
     return best;
   }
 }
+
+/**
+ * Every way to slide hull a clear of hull b along one of their four axes, shortest
+ * first (separating-axis test between two rectangles). Null when they are apart.
+ * Hulls are { x, y, fx, fy (unit vector toward the bow), hl, hb (half length, half beam) }.
+ * Each way carries its axis, the side a is on (sign) and the centre distance along
+ * the axis at which the two just clear (reach).
+ */
+export function apart(a, b, gap = 0.6) {
+  const dx = a.x - b.x, dy = a.y - b.y;
+  const ways = [];
+  for (const [ax, ay] of [[a.fx, a.fy], [a.fy, -a.fx], [b.fx, b.fy], [b.fy, -b.fx]]) {
+    const ra = a.hl * Math.abs(a.fx * ax + a.fy * ay) + a.hb * Math.abs(a.fy * ax - a.fx * ay);
+    const rb = b.hl * Math.abs(b.fx * ax + b.fy * ay) + b.hb * Math.abs(b.fy * ax - b.fx * ay);
+    const dist = dx * ax + dy * ay;
+    const reach = ra + rb + gap;
+    const overlap = reach - Math.abs(dist);
+    if (overlap <= 0.01) return null;
+    const sign = dist >= 0 ? 1 : -1;
+    ways.push({ x: ax * overlap * sign, y: ay * overlap * sign, depth: overlap, ax, ay, sign, reach });
+  }
+  return ways.sort((p, q) => p.depth - q.depth);
+}

@@ -157,7 +157,7 @@ async function boot() {
   const panel = new Panel({
     onSelect: (mmsi) => select(mmsi, true),
     onToggleOthers: (on) => {
-      fleet.showOthers = on;
+      fleet.setShowOthers(on);
     },
   });
   feed.onUpdate(() => {

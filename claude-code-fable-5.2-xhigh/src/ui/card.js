@@ -20,18 +20,20 @@ function etaText(eta) {
   return `${month} ${d}, ${String(h).padStart(2, '0')}:${String(mi).padStart(2, '0')} UTC`;
 }
 
-function planDrawing(v) {
-  if (v.length == null || v.beam == null) return '';
+const metres = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
+
+function planDrawing(length, beam) {
+  if (length == null || beam == null) return '';
   // Plan view to scale: the hull's real proportions with its dimensions marked.
   const W = 300, H = 66;
-  const scale = Math.min((W - 20) / v.length, 30 / v.beam);
-  const l = v.length * scale, b = Math.max(3, v.beam * scale);
+  const scale = Math.min((W - 20) / length, 30 / beam);
+  const l = length * scale, b = Math.max(3, beam * scale);
   const x0 = (W - l) / 2, y0 = 6;
   const bow = Math.min(l * 0.2, b * 1.6);
-  return `<svg class="plan" viewBox="0 0 ${W} ${H}" role="img" aria-label="Plan view, ${Math.round(v.length)} by ${Math.round(v.beam)} metres">
+  return `<svg class="plan" viewBox="0 0 ${W} ${H}" role="img" aria-label="Plan view, ${Math.round(length)} by ${Math.round(beam)} metres">
     <path d="M${x0} ${y0}H${x0 + l - bow}Q${x0 + l - bow * 0.3} ${y0} ${x0 + l} ${y0 + b / 2}Q${x0 + l - bow * 0.3} ${y0 + b} ${x0 + l - bow} ${y0 + b}H${x0}z" fill="currentColor" opacity="0.9"/>
     <path d="M${x0} ${y0 + b + 9}H${x0 + l}M${x0} ${y0 + b + 5}v8M${x0 + l} ${y0 + b + 5}v8" stroke="currentColor" stroke-width="1" fill="none" opacity="0.6"/>
-    <text x="${W / 2}" y="${y0 + b + 23}" text-anchor="middle">${Math.round(v.length)} m long, ${Math.round(v.beam)} m beam</text>
+    <text x="${W / 2}" y="${y0 + b + 23}" text-anchor="middle">${Math.round(length)} m long, ${Math.round(beam)} m beam</text>
   </svg>`;
 }
 
@@ -51,26 +53,33 @@ export function renderCard(el, e, now = Date.now()) {
     : null;
   const standIn = e.size.estimated ? `no hull size reported, so it is drawn at a typical ${e.size.L} m by ${e.size.B} m` : null;
   const drawn = `${esc(e.model.label[0].toUpperCase() + e.model.label.slice(1))}${[why, standIn].filter(Boolean).map((t) => `<small>${esc(t)}</small>`).join('')}`;
+  // A yacht size that can only be feet: show what was reported and what is drawn.
+  const feet = e.size.feet;
+  const sizeText = v.length == null || v.beam == null ? unknown
+    : feet ? `${metres(e.size.L)} m × ${metres(e.size.B)} m<small>${esc(`reported as ${v.length} m × ${v.beam} m. A yacht that long is never that wide, so the figures are read as feet`)}</small>`
+    : `${esc(v.length)} m × ${esc(v.beam)} m`;
   const ll = v.lat != null ? `${Math.abs(v.lat).toFixed(4)}° ${v.lat >= 0 ? 'N' : 'S'}, ${Math.abs(v.lon).toFixed(4)}° ${v.lon >= 0 ? 'E' : 'W'}` : null;
   const newest = e.path[e.path.length - 1];
   const lag = newest ? Math.hypot(newest.x - e.pos.x, newest.y - e.pos.y) : 0;
   const warns = [];
   if (e.stale) warns.push(`Not heard for ${ago(e.seenMs, now).replace(' ago', '')}. It may have left or switched its transponder off.`);
   if (!e.headingKnown) warns.push(e.state === 'underway' ? 'Heading not reported. Drawn on its course over ground.' : e.headingFrom === 'wharf' ? 'Heading not reported. Drawn lying along the wharf.' : e.headingFrom === 'dock' ? 'Heading not reported. Drawn lying along its dock, so bow and stern may be swapped.' : 'Heading not reported. Drawn the way the hull fits the water around it, so bow and stern may be swapped.');
+  const moved = e.nudge && e.state !== 'underway' ? Math.round(Math.hypot(e.nudge.x, e.nudge.y)) : 0;
+  if (moved >= 3) warns.push(`Drawn ${moved} m from its reported position to keep it clear of the dock and the boats around it. Reported positions are often a few metres out.`);
   if (lag > 60) warns.push(`The model is following the ship's real track and is ${lag >= 1000 ? `${(lag / 1000).toFixed(1)} km` : `${Math.round(lag / 10) * 10} m`} short of this report. The ring marks the reported position.`);
-  const key = JSON.stringify([v.mmsi, v.seen, e.state, e.stale, e.headingKnown, e.headingFrom, Math.round(lag / 50), e.model.key, Math.floor((now - e.seenMs) / 60000)]);
+  const key = JSON.stringify([v.mmsi, v.seen, e.state, e.stale, e.headingKnown, e.headingFrom, Math.round(lag / 50), moved, e.model.key, Math.floor((now - e.seenMs) / 60000)]);
   if (el.dataset.key === key) return;
   el.dataset.key = key;
   el.innerHTML = `
     <button type="button" class="close" data-act="close" aria-label="Close ship details">&times;</button>
     <h2>${esc(v.name || 'Name unknown')}</h2>
     <p class="sub">${esc(status)}</p>
-    ${planDrawing(v)}
+    ${feet ? planDrawing(e.size.L, e.size.B) : planDrawing(v.length, v.beam)}
     <dl>
       <dt>Flag</dt><dd>${country ? `${flagEmoji(v.flag)} ${esc(country)}` : show(v.flag)}</dd>
       <dt>IMO</dt><dd>${show(v.imo)}</dd>
       <dt>Type</dt><dd>${typeName ? `${esc(typeName)}<small>AIS type ${esc(v.type)}</small>` : unknown}</dd>
-      <dt>Length × beam</dt><dd>${v.length != null && v.beam != null ? `${esc(v.length)} m × ${esc(v.beam)} m` : unknown}</dd>
+      <dt>Length × beam</dt><dd>${sizeText}</dd>
       <dt>Speed</dt><dd>${v.sog != null ? `${v.sog.toFixed(1)} knots` : unknown}</dd>
       <dt>Destination</dt><dd>${show(v.destination)}</dd>
       <dt>ETA</dt><dd>${show(etaText(v.eta))}</dd>

@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { toWorld, KNOT } from '../geo.js';
 import { clamp, lerp, lerpAngle, angleDiff, smoothstep, rng, D2R } from '../util.js';
 import { MODELS, TYPICAL_SIZE } from '../ships/models.js';
-import { chooseModel, findBerth, nearestPlace } from '../classify.js';
-import { PierIndex } from './piers.js';
+import { chooseModel, findBerth, nearestPlace, sizeInFeet, FOOT } from '../classify.js';
+import { PierIndex, apart } from './piers.js';
 import { RED, GREEN, WHITE } from './lights.js';
 
 const WAKE_SECONDS = 150;
@@ -11,6 +11,19 @@ const WAKE_POINTS = 28;
 const STALE_MS = 3 * 3600e3;      // drawn dimmed when not heard for this long
 const DROP_MS = 24 * 3600e3;      // not drawn at all after a day of silence
 const WARM_DECK = [1.0, 0.86, 0.62];
+const MAX_NUDGE = 30;             // furthest a moored hull is drawn from its reported position, metres
+const MAX_SHOVE = 25;             // furthest a hull is eased aside for a passing vessel, metres
+
+// A hull pushed off a dock must not be pushed back onto it by a neighbour.
+const blocked = (hull, dx, dy) => {
+  const d = Math.hypot(dx, dy) || 1;
+  for (const w of hull.walls) if ((dx * w.x + dy * w.y) / d < -0.3) return true;
+  return false;
+};
+const addWall = (hull, x, y) => {
+  for (const w of hull.walls) if (w.x * x + w.y * y > 0.95) return;
+  hull.walls.push({ x, y });
+};
 
 const WAKE_VERT = /* glsl */ `
 attribute vec2 aUv;
@@ -110,6 +123,8 @@ export class Fleet {
     this.kelvinGeometry = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
 
     this.piers = new PierIndex(harbor.piers);
+    this._drawn = [];
+    this._active = [];
 
     // Ring around the selected vessel, and a tick at its newest reported position.
     const ring = new THREE.RingGeometry(0.96, 1.0, 96).rotateX(-Math.PI / 2);
@@ -149,18 +164,23 @@ export class Fleet {
         e.needsFit = null;
       }
     }
-    // With every heading settled, slide moored hulls clear of the wharf or dock they lie at.
-    for (const e of this.entities.values()) {
-      e.nudge = !e.gone && e.state !== 'underway' ? this._clearance(e) : null;
-    }
+    // With every heading settled, slide moored hulls clear of docks and of each other.
+    this._settle();
+  }
+
+  /** Small craft can be hidden; a hidden boat must not hold a place among the drawn ones. */
+  setShowOthers(on) {
+    if (this.showOthers === on) return;
+    this.showOthers = on;
+    this._settle();
   }
 
   _create(v) {
     return {
-      mmsi: v.mmsi, v, group: v.group, path: [], s: 0, rate: 1, fresh: true,
+      mmsi: v.mmsi, v, group: v.group, path: [], s: 0, rate: 1, fresh: true, unit: 1,
       pos: { x: 0, y: 0 }, heading: 0, headingKnown: false, speed: 0, fade: 0, gone: false,
       object: null, built: null, model: null, berth: null, place: null, wake: null, kelvin: null, deck: { value: 0 },
-      screen: { x: 0, y: 0 },
+      screen: { x: 0, y: 0 }, bx: 0, by: 0, shx: 0, shy: 0, px: 0, py: 0,
     };
   }
 
@@ -214,12 +234,15 @@ export class Fleet {
 
     // Berth, model and size are decided from the newest report.
     const dims = v.length != null && v.beam != null;
-    const off = this._centreOffset(v, reportHeading ?? 0);
+    // A yacht size that can only be feet is drawn as feet. The card shows both.
+    const unit = dims && sizeInFeet(v) ? FOOT : 1;
+    e.unit = unit;
+    const off = this._centreOffset(v, reportHeading ?? 0, unit);
     const cx = here.x + off.x, cy = here.y + off.y;
     // Tied-up boats still report a few tenths of a knot of GPS drift.
     const tied = v.navStatus === 5 || v.navStatus === 1;
     const still = v.sog == null || v.sog < (tied ? 1.6 : v.group === 'other' ? 1.0 : 0.7);
-    e.berth = still ? findBerth(cx, cy, v.beam, this.harbor) : null;
+    e.berth = still ? findBerth(cx, cy, v.beam != null ? v.beam * unit : null, this.harbor) : null;
     e.place = still && !e.berth ? nearestPlace(cx, cy, this.harbor) : null;
     e.state = !still ? 'underway' : e.berth ? 'berth' : v.navStatus === 1 ? 'anchor' : 'still';
     const choice = chooseModel(v, e.berth);
@@ -228,7 +251,8 @@ export class Fleet {
     const sizeKey = dims ? `${v.length}:${v.beam}` : 'typical';
     if (!e.model || e.sizeKey !== sizeKey || (e.model.how !== 'ais' && choice.how !== e.model.how && (choice.how === 'name' || choice.how === 'ais'))) {
       const typical = TYPICAL_SIZE[choice.model];
-      e.size = dims ? { L: v.length, B: v.beam, estimated: false } : { L: typical[0], B: typical[1], estimated: true };
+      const m = (n) => Math.round(n * unit * 10) / 10;
+      e.size = dims ? { L: m(v.length), B: m(v.beam), estimated: false, feet: unit !== 1 } : { L: typical[0], B: typical[1], estimated: true, feet: false };
       e.model = { ...choice, label: MODELS[choice.model].label, key: `${choice.model}:${e.size.L}:${e.size.B}` };
       e.sizeKey = sizeKey;
     }
@@ -272,40 +296,118 @@ export class Fleet {
   }
 
   /**
-   * Where a moored hull has to move so it is not drawn through the wharf or dock it
-   * is tied to. GPS and antenna-offset errors of a few metres cause the overlap. The
-   * push is the shortest one that clears every pier nearby, and never more than 30 m.
+   * Moored and anchored hulls are drawn where they report, and a report is often a few
+   * metres out: enough to draw a boat through its dock, or through the boat tied up
+   * beside it. Each hull is first slid off the wharf or dock it lies at. Hulls that
+   * still overlap then push each other apart by the shortest move, the smaller giving
+   * way to the larger, and never back onto a dock. No hull ends up more than 30 m
+   * from its reported position.
    */
-  _clearance(e) {
+  _settle() {
+    const hulls = [];
+    for (const e of this.entities.values()) {
+      e.nudge = null;
+      if (e.gone || e.state === 'underway' || !e.path.length) continue;
+      if (e.group === 'other' && !this.showOthers) continue;       // a hidden boat holds no place
+      hulls.push(this._hullOf(e));
+    }
+    for (const h of hulls) this._offDocks(h);
+    for (let round = 0; round < 14; round++) {
+      let moved = false;
+      for (let i = 0; i < hulls.length; i++) {
+        const a = hulls[i];
+        for (let j = i + 1; j < hulls.length; j++) {
+          const b = hulls[j];
+          const reach = a.hl + b.hl + 2;
+          if (Math.abs(a.x - b.x) > reach || Math.abs(a.y - b.y) > reach) continue;
+          const ways = apart(a, b);
+          if (!ways) continue;
+          for (const w of ways) {
+            if (w.depth > MAX_NUDGE) break;
+            const aStuck = blocked(a, w.x, w.y), bStuck = blocked(b, -w.x, -w.y);
+            if (aStuck && bStuck) continue;            // both against a dock that way: try sliding along it
+            const share = aStuck ? 0 : bStuck ? 1 : b.mass ** 2 / (a.mass ** 2 + b.mass ** 2);
+            a.x += w.x * share;
+            a.y += w.y * share;
+            b.x -= w.x * (1 - share);
+            b.y -= w.y * (1 - share);
+            a.dirty = b.dirty = moved = true;
+            break;
+          }
+        }
+      }
+      if (!moved) break;
+      for (const h of hulls) {
+        if (h.dirty) this._offDocks(h);
+        h.dirty = false;
+      }
+    }
+    for (const h of hulls) {
+      const nx = h.x - h.x0, ny = h.y - h.y0;
+      const d = Math.hypot(nx, ny);
+      if (d < 0.1) continue;
+      const k = d > MAX_NUDGE ? MAX_NUDGE / d : 1;
+      h.e.nudge = { x: nx * k, y: ny * k };
+    }
+  }
+
+  /** A vessel's hull as a rectangle at its newest report: centre, bow direction, half sizes. */
+  _hullOf(e) {
     const v = e.v;
     const here = e.path[e.path.length - 1];
     const hd = here.hdg ?? e.lastHeading ?? e.assumedHeading ?? v.cog ?? 0;
-    const off = this._centreOffset(v, hd);
+    const off = this._centreOffset(v, hd, e.unit);
     const h = hd * D2R;
-    const hull = { x: here.x + off.x, y: here.y + off.y, fx: Math.sin(h), fy: Math.cos(h), hl: e.size.L / 2, hb: e.size.B / 2 };
-    const x0 = hull.x, y0 = hull.y;
+    const x = here.x + off.x, y = here.y + off.y;
+    // Weight: a big hull barely moves for a small one. A vessel not heard for hours, or
+    // drawn at a stand-in size, is the less certain of two and gives way more.
+    const mass = e.size.L * e.size.B * (e.stale ? 0.3 : 1) * (e.size.estimated ? 0.6 : 1);
+    return { e, hd, x, y, x0: x, y0: y, fx: Math.sin(h), fy: Math.cos(h), hl: e.size.L / 2, hb: e.size.B / 2, mass, walls: [], dirty: false };
+  }
+
+  /** Slide a hull the shortest way off its wharf and off every pier it overlaps. */
+  _offDocks(hull) {
+    const e = hull.e;
     if (e.berth) {
-      const w = this._clearWharf(hull.x, hull.y, hd, e.size, e.berth);
+      const w = this._clearWharf(hull.x, hull.y, hull.hd, e.size, e.berth);
       if (w) {
         hull.x += w.x;
         hull.y += w.y;
+        addWall(hull, e.berth.out[0], e.berth.out[1]);
       }
     }
-    for (let pass = 0; pass < 8; pass++) {
+    const sx = hull.x, sy = hull.y;
+    const deepest = () => {
       let worst = null;
       for (const seg of this.piers.near(hull.x, hull.y, hull.hl + 12)) {
         const push = PierIndex.push(hull, seg);
-        if (push && (!worst || push.depth > worst.depth)) worst = push;
+        if (push && push.depth > 0.01 && (!worst || push.depth > worst.depth)) worst = push;
       }
-      if (!worst) break;
+      return worst;
+    };
+    const walls = hull.walls.length;
+    for (let pass = 0; pass < 8; pass++) {
+      const worst = deepest();
+      if (!worst) return;
       hull.x += worst.x;
       hull.y += worst.y;
+      addWall(hull, worst.x / worst.depth, worst.y / worst.depth);
     }
-    const nx = hull.x - x0, ny = hull.y - y0;
-    const d = Math.hypot(nx, ny);
-    if (d < 0.1) return null;
-    const k = d > 30 ? 30 / d : 1;
-    return { x: nx * k, y: ny * k };
+    if (!deepest()) return;
+    // Boxed in: the report sits where docks meet, and each push off one dock lands on
+    // another. Look around the report for the nearest spot of open water that takes the hull.
+    hull.walls.length = walls;
+    for (let r = 1.5; r <= 18; r += 1.5) {
+      const n = Math.max(8, Math.round(r * 2.4));
+      for (let i = 0; i < n; i++) {
+        const t = (i / n) * Math.PI * 2;
+        hull.x = sx + Math.cos(t) * r;
+        hull.y = sy + Math.sin(t) * r;
+        if (!deepest()) return;
+      }
+    }
+    hull.x = sx;
+    hull.y = sy;
   }
 
   /**
@@ -320,7 +422,7 @@ export class Fleet {
     if (!water) return fallback;
     const L = self.size.L, B = self.size.B;
     const score = (hd) => {
-      const off = this._centreOffset(v, hd);
+      const off = this._centreOffset(v, hd, self.unit);
       const h = hd * D2R;
       let sum = 0;
       for (let i = -4; i <= 4; i++) {
@@ -376,10 +478,10 @@ export class Fleet {
   }
 
   /** Offset from the GPS antenna to the middle of the hull, in world metres. */
-  _centreOffset(v, headingDeg) {
+  _centreOffset(v, headingDeg, unit = 1) {
     if (v.toBow == null || v.toStern == null || v.toPort == null || v.toStarboard == null) return { x: 0, y: 0 };
-    const fwd = (v.toBow - v.toStern) / 2;
-    const stbd = (v.toStarboard - v.toPort) / 2;
+    const fwd = ((v.toBow - v.toStern) / 2) * unit;
+    const stbd = ((v.toStarboard - v.toPort) / 2) * unit;
     const h = headingDeg * D2R;
     return { x: Math.sin(h) * fwd + Math.cos(h) * stbd, y: Math.cos(h) * fwd - Math.sin(h) * stbd };
   }
@@ -491,17 +593,16 @@ export class Fleet {
     const len = e.size.L;
     const span = WAKE_SECONDS * 1000 * clamp(0.45 + e.speed / 14, 0.45, 1);
     // Samples run from the ship's stern back in time along the recorded track.
-    const off = this._centreOffset(e.v, e.heading);
     const h = e.heading * D2R;
-    const sternX = e.pos.x + off.x - Math.sin(h) * len * 0.5;
-    const sternY = e.pos.y + off.y - Math.cos(h) * len * 0.5;
+    const sternX = e.centre.x - Math.sin(h) * len * 0.5;
+    const sternY = e.centre.y - Math.cos(h) * len * 0.5;
     let px = sternX, py = sternY, dirx = -Math.sin(h), diry = -Math.cos(h);
     for (let i = 0; i < WAKE_POINTS; i++) {
       const f = i / (WAKE_POINTS - 1);
       let x = sternX, y = sternY;
       if (i > 0) {
         const p = this._sample(e, e.s - f * span);
-        const po = this._centreOffset(e.v, p.hdg ?? e.heading);
+        const po = this._centreOffset(e.v, p.hdg ?? e.heading, e.unit);
         const ph = (p.hdg ?? e.heading) * D2R;
         x = p.x + po.x - Math.sin(ph) * len * 0.5;
         y = p.y + po.y - Math.cos(ph) * len * 0.5;
@@ -546,6 +647,8 @@ export class Fleet {
     const timeLeft = Math.max(8000, this.nextRefreshAt - nowMs);
     const view = this.stage.viewRect(600);
 
+    const drawn = this._drawn;
+    drawn.length = 0;
     for (const [mmsi, e] of this.entities) {
       // ---- advance along the recorded track
       const newest = e.path[e.path.length - 1];
@@ -583,18 +686,26 @@ export class Fleet {
         if (this.selected === mmsi) this.selected = null;
         continue;
       }
-      const off = this._centreOffset(e.v, e.heading);
+      const off = this._centreOffset(e.v, e.heading, e.unit);
       // Ease the dock correction in and out as the vessel arrives or leaves.
-      e.nudgeMix = clamp((e.nudgeMix ?? 1) + (e.nudge && e.state !== 'underway' && remaining < 1500 ? dt : -dt) / 4, 0, 1);
+      e.travelling = e.state === 'underway' || remaining > 1500;
+      e.nudgeMix = clamp((e.nudgeMix ?? 1) + (e.nudge && !e.travelling ? dt : -dt) / 4, 0, 1);
       if (e.nudge) e.nudgeLast = e.nudge;
       const nd = e.nudgeLast && e.nudgeMix > 0 ? e.nudgeLast : null;
-      const cx = e.pos.x + off.x + (nd ? nd.x * e.nudgeMix : 0), cy = e.pos.y + off.y + (nd ? nd.y * e.nudgeMix : 0);
+      e.bx = e.pos.x + off.x + (nd ? nd.x * e.nudgeMix : 0);
+      e.by = e.pos.y + off.y + (nd ? nd.y * e.nudgeMix : 0);
+      e.hidden = e.group === 'other' && !this.showOthers;
+      drawn.push(e);
+    }
+    this._shove(drawn, dt);
+
+    for (const e of drawn) {
+      const cx = e.bx + e.shx, cy = e.by + e.shy;
       e.centre = { x: cx, y: cy };
       const sp = this.stage.worldToScreen(cx, cy, 0);
       e.screen.x = sp.x;
       e.screen.y = sp.y;
       const inView = cx > view.west && cx < view.east && cy > view.south && cy < view.north;
-      e.hidden = e.group === 'other' && !this.showOthers;
 
       if (e.hidden) {
         if (e.object) e.object.visible = false;
@@ -647,7 +758,7 @@ export class Fleet {
       const d = Math.hypot(newest.x - sel.pos.x, newest.y - sel.pos.y);
       this.fix.visible = d > Math.max(40, 14 * mpp);
       if (this.fix.visible) {
-        const o = this._centreOffset(sel.v, newest.hdg ?? sel.heading);
+        const o = this._centreOffset(sel.v, newest.hdg ?? sel.heading, sel.unit);
         const fr = Math.max(7 * mpp, 10);
         this.fix.position.set(newest.x + o.x, 0.5, -(newest.y + o.y));
         this.fix.scale.set(fr, 1, fr);
@@ -655,6 +766,98 @@ export class Fleet {
     } else {
       this.ring.visible = false;
       this.fix.visible = false;
+    }
+  }
+
+  /**
+   * A vessel that is moving follows the track it reported, and that track can run
+   * through the drawn hull of another vessel: a tug made fast to a ship, a boat leaving
+   * a crowded dock, a ship passing a boat whose last report was hours ago. Wherever two
+   * hulls would overlap they are held apart. The smaller one gives way, and between
+   * two of a size the one on the move steers round the one lying still. A boat that
+   * was moved aside eases back to its place once the way is clear. Moored hulls
+   * are already clear of each other (see _settle), so only vessels on the move and
+   * the ones they touch are looked at.
+   */
+  _shove(drawn, dt) {
+    const ease = Math.exp(-dt * 1.2);
+    const active = this._active;
+    active.length = 0;
+    for (const e of drawn) {
+      e.hull = null;
+      e.acting = false;
+      if (e.hidden || e.gone) {
+        e.shx = e.shy = 0;
+        continue;
+      }
+      e.px = e.shx;
+      e.py = e.shy;
+      e.shx *= ease;
+      e.shy *= ease;
+      if (Math.abs(e.shx) + Math.abs(e.shy) < 0.02) e.shx = e.shy = 0;
+      if (e.travelling || e.shx !== 0 || e.shy !== 0) {
+        e.acting = true;
+        active.push(e);
+      }
+    }
+    if (!active.length) return;
+    const hullAt = (e) => {
+      if (!e.hull) {
+        const h = e.heading * D2R;
+        const fx = Math.sin(h), fy = Math.cos(h), hl = e.size.L / 2, hb = e.size.B / 2;
+        e.hull = { x: 0, y: 0, fx, fy, hl, hb, heft: (e.size.L * e.size.B * (e.stale ? 0.3 : 1) * (e.travelling ? 0.35 : 1)) ** 4, home: { x: e.bx, y: e.by, fx, fy, hl, hb } };
+      }
+      e.hull.x = e.bx + e.shx;
+      e.hull.y = e.by + e.shy;
+      return e.hull;
+    };
+    for (let round = 0; round < 4; round++) {
+      let moved = false;
+      for (let i = 0; i < active.length; i++) {
+        const m = active[i];
+        for (const o of drawn) {
+          if (o === m || o.hidden || o.gone) continue;
+          if (o.acting && o.mmsi < m.mmsi) continue;            // two vessels on the move are handled once
+          const reach = (m.size.L + o.size.L) / 2 + 2;
+          if (Math.abs(m.bx + m.shx - o.bx - o.shx) > reach || Math.abs(m.by + m.shy - o.by - o.shy) > reach) continue;
+          const a = hullAt(m), b = hullAt(o);
+          const now = apart(a, b);
+          if (!now) continue;
+          // Which way to part is judged from where the two would be if left alone, so a
+          // boat held back behind another is let round its side once its track runs on past.
+          const meant = apart(a.home, b.home);
+          const w = meant ? meant[0] : now[0];
+          const need = w.reach - w.sign * ((a.x - b.x) * w.ax + (a.y - b.y) * w.ay);
+          if (need <= 0.01) continue;
+          const px = w.ax * need * w.sign, py = w.ay * need * w.sign;
+          const share = b.heft / (a.heft + b.heft);
+          m.shx += px * share;
+          m.shy += py * share;
+          o.shx -= px * (1 - share);
+          o.shy -= py * (1 - share);
+          if (!o.acting) {
+            o.acting = true;
+            active.push(o);
+          }
+          moved = true;
+        }
+      }
+      if (!moved) break;
+    }
+    // No hull is moved far from where it reports, and none jumps: a change of side is a slide.
+    const step = Math.max(14 * dt, 0.25);
+    for (const e of active) {
+      const d = Math.hypot(e.shx, e.shy);
+      if (d > MAX_SHOVE) {
+        e.shx *= MAX_SHOVE / d;
+        e.shy *= MAX_SHOVE / d;
+      }
+      const jx = e.shx - e.px, jy = e.shy - e.py;
+      const j = Math.hypot(jx, jy);
+      if (j > step) {
+        e.shx = e.px + (jx / j) * step;
+        e.shy = e.py + (jy / j) * step;
+      }
     }
   }
 

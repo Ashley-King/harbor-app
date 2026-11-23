@@ -130,12 +130,13 @@ export class Panel {
     const ships = ents.filter((e) => e.group === 'ship');
     const work = ents.filter((e) => e.group === 'tug' || e.group === 'pilot');
     const small = ents.filter((e) => e.group === 'other');
-    const bySize = (a, b) => (b.v.length || 0) - (a.v.length || 0) || String(a.v.name).localeCompare(String(b.v.name));
+    const len = (e) => (e.size && e.size.feet ? e.size.L : e.v.length || 0);
+    const bySize = (a, b) => len(b) - len(a) || String(a.v.name).localeCompare(String(b.v.name));
     const row = (e, note) => {
       const v = e.v;
       const country = countryName(v.flag);
       const what = [kindText(e), country].filter(Boolean).join(', ');
-      const size = v.length != null ? `${Math.round(v.length)} m` : 'size unknown';
+      const size = v.length != null ? `${Math.round(e.size && e.size.feet ? e.size.L : v.length)} m` : 'size unknown';
       const state = e.stale ? `heard ${ago(e.seenMs, now)}` : note;
       return `<li><button type="button" class="ship${e.stale ? ' is-stale' : ''}" data-mmsi="${v.mmsi}" data-kind="${e.group}" aria-current="${selected === v.mmsi}">
         ${hullIcon(e.size ? e.size.L : v.length)}
