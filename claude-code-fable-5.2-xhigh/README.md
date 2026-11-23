@@ -42,7 +42,7 @@ npm run preview
 
 ## Live data
 
-The browser calls one endpoint in this app, `/api/harbor`, every 10 minutes. That Vercel serverless function calls the sources, so the browser never depends on them directly. None of the sources needs a key, and the function sends the User-Agent `harbor-bench/1.0`.
+The browser calls one endpoint in this app, `/api/harbor`, every 10 minutes. That serverless function calls the sources, so the browser never depends on them directly. The same data code runs as a Vercel function and as a Cloudflare Worker. None of the sources needs a key, and the function sends the User-Agent `harbor-bench/1.0`.
 
 | Data | Source |
 | --- | --- |
@@ -93,8 +93,11 @@ The files under `public/data` are built from those sources by the scripts in `to
 ## Layout
 
 ```
-api/harbor.js        serverless function: ships, tracks, tide, air gap
+api/harbor.js        the data endpoint as a Vercel function
+worker/index.js      the data endpoint as a Cloudflare Worker
+lib/harbor.js        the data code both of them run: ships, tracks, tide, air gap
 lib/vessels.js       AIS field handling shared by the function and the page
+wrangler.jsonc       Cloudflare config
 src/main.js          page start-up and frame loop
 src/scene/           camera, imagery and water shader, lights, cranes, ships
 src/ships/           the 3D vessel models
@@ -137,7 +140,7 @@ python3 tools/build_lights.py
 python3 tools/build_hires.py
 ```
 
-## Deploy
+## Deploy to Vercel
 
 The folder is a self-contained Vite app with one function. Deployed with the Vercel CLI from inside this folder, so this folder is the project root:
 
@@ -150,3 +153,39 @@ vercel deploy --prod
 ```
 
 No environment variables are needed.
+
+## Deploy to Cloudflare
+
+The same folder deploys to Cloudflare Workers. Cloudflare serves the built site (`dist/`) as static files and runs `worker/index.js` for `/api/harbor`. The settings are in `wrangler.jsonc`, and the cache rules for the static files are in `public/_headers`.
+
+From GitHub, with Workers Builds: in the Cloudflare dashboard open Workers & Pages, create an application from the GitHub repository, and use these settings.
+
+| Setting | Value |
+| --- | --- |
+| Project name | `harbor-claude-code-fable-52-xhigh` (it must match `name` in `wrangler.jsonc`) |
+| Branch | `deploy` |
+| Root directory | `claude-code-fable-5.2-xhigh` |
+| Build command | `npm run build` |
+| Deploy command | `npx wrangler deploy` |
+
+From a machine instead:
+
+```bash
+npm install
+```
+
+```bash
+npx wrangler login
+```
+
+```bash
+npm run cf:deploy
+```
+
+To run it locally the way Cloudflare does, at http://localhost:8787:
+
+```bash
+npm run cf:dev
+```
+
+No environment variables or secrets are needed. It fits the Workers Free plan: static files are served free, and only `/api/harbor` runs the Worker. That plan allows 50 outgoing calls per request, so on Cloudflare the endpoint fetches tracks for up to 32 moving vessels where Vercel fetches 40. A warm Worker shares one finished answer for 20 seconds.

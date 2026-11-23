@@ -1,6 +1,8 @@
 # secrets and local config
 .env*
+.dev.vars*
 .vercel
+.wrangler
 # dependencies and build output
 node_modules
 dist
