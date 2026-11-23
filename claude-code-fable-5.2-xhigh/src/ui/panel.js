@@ -1,3 +1,4 @@
+import { ICONS } from './pins.js';
 import { clock, clockSec, clockSmart, dayLabel, zoneName, ago, countdown, esc, countryName } from '../util.js';
 import { aisTypeName } from '../../lib/vessels.js';
 
@@ -27,9 +28,9 @@ export class Panel {
     this.onInfo = onInfo;
     // Which optional sections are switched on in the layers panel.
     this.show = { weather: true, alerts: true, inbound: true, log: true };
-    this.infos = { alerts: [], inbound: [] };
+    this.infos = { alerts: [], inbound: [], 'wreck-list': [], 'dolphin-list': [] };
     this.logOpen = false;
-    for (const id of ['alerts', 'inbound']) {
+    for (const id of ['alerts', 'inbound', 'wreck-list', 'dolphin-list']) {
       $(id).addEventListener('click', (ev) => {
         const b = ev.target.closest('[data-info]');
         const info = b && this.infos[id][Number(b.dataset.info)];
@@ -298,6 +299,29 @@ export class Panel {
     const html = `<div class="group"><h2>Arriving from sea<span class="count">${ships.length === 1 ? '1 ship' : `${ships.length} ships`}</span></h2>${ships.length ? `<ul class="ship-list">${ships.map(row).join('')}</ul>` : '<p class="empty">No ship in range offshore is heading in</p>'}</div>`;
     if (html !== this._inbound) {
       this._inbound = html;
+      el.innerHTML = html;
+    }
+  }
+
+  // ------------------------------------------------------------ wrecks and dolphins
+
+  /**
+   * A list of the things one kind of pin marks, so they can be found without hunting
+   * on the map. `items` are the same objects the pins open: { title, sub, ... }. An item may give
+   * its own two lines for the list as `row`.
+   * `kind` is the pin kind, for the picture. The section follows its map layer.
+   */
+  renderPlaces(id, kind, heading, items, on, empty) {
+    const el = $(id);
+    el.hidden = !on;
+    if (el.hidden) return;
+    this.infos[id] = items;
+    const row = (it, i) => `<li><button type="button" class="ship place" data-info="${i}">
+        <span class="badge k-${kind}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[kind]}</svg></span>
+        <span class="txt"><span class="name">${esc(it.row ? it.row[0] : it.title)}</span><span class="what">${esc(it.row ? it.row[1] : it.sub || '')}</span></span></button></li>`;
+    const html = `<div class="group"><h2>${esc(heading)}<span class="count">${items.length}</span></h2>${items.length ? `<ul class="ship-list">${items.map(row).join('')}</ul>` : `<p class="empty">${esc(empty)}</p>`}</div>`;
+    if (html !== this[`_${id}`]) {
+      this[`_${id}`] = html;
       el.innerHTML = html;
     }
   }

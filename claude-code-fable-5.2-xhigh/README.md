@@ -22,7 +22,7 @@ An overhead view of the large ships in Charleston Harbor, South Carolina, drawn 
 - The National Weather Service marine forecast for the harbor, with any active advisory shown on the board and as a chip on the map.
 - Ships arriving from sea: large ships outside the jetties that are heading for the entrance, with distance and an estimated time at the jetties.
 - A harbor log of arrivals, departures and the biggest ship of each day, kept for a week.
-- Pins for 12 landmarks, 10 wrecks with a story (the Housatonic, the Hunley, the Keokuk, the Stone Fleet, blockade runners and more) and every wreck on the NOAA chart, and recent dolphin sightings from iNaturalist.
+- Pins for 12 landmarks, the wrecks with a known story (the Housatonic, the Hunley, the Patapsco, the Weehawken and several blockade runners) and every wreck on the NOAA chart, and recent dolphin sightings from iNaturalist. The board lists the named wrecks and the sightings too, and a tap on one opens it on the map.
 
 ## Run it locally
 
@@ -110,7 +110,7 @@ The files under `public/data` are built from those sources by the scripts in `to
 - Distance to a destination is a rough sea route through a few turning points (round Florida, through Panama, Gibraltar, Suez or Malacca), not a routed voyage. Travel time uses the ship's speed now, or 16 knots when it is not moving. A destination the crew typed in a form the port table does not know is shown as typed.
 - Ships arriving from sea are only those the AIS network can hear, which is roughly 20 to 40 nautical miles out. The time at the jetties is distance over speed now.
 - The harbor log starts empty and sees the harbor once every 10 minutes, so a ship that comes and goes inside 10 minutes is missed. On Vercel there is no log, because nothing there keeps it.
-- Positions of the ten historic wrecks are approximate. Charted wrecks come from the NOAA chart, which records no names, so those pins say only what the chart knows. Dolphin sightings are what people chose to report, at the accuracy they reported.
+- Positions of the historic wrecks are approximate, and the two that lie south of the mapped area (the Keokuk and the Stone Fleet) are not shown. Charted wrecks come from the NOAA chart, which records no names, so those pins say only what the chart knows. Dolphin sightings are what people chose to report, at the accuracy they reported.
 - A ship has a backstory only if Wikidata has an entry with its IMO number. Most do not.
 - Not for navigation.
 

@@ -324,18 +324,28 @@ async function boot() {
 
   const drawDolphins = () => {
     const d = extras.state.dolphins.data;
-    pins.set('dolphins', ((d && d.sightings) || []).map((o) => {
+    // Newest first, which is also the order of the list on the board.
+    const sightings = [...((d && d.sightings) || [])].sort((a, b) => String(b.on || '').localeCompare(String(a.on || '')));
+    pins.set('dolphins', sightings.map((o) => {
       const at = place(o.lat, o.lon);
       const when = o.on ? clockSmart(Date.parse(`${o.on}T12:00:00-05:00`)).split(',').slice(0, 2).join(',') : 'date not given';
       return {
         x: at.x, y: at.y, at, label: `Bottlenose dolphin sighting, ${when}`,
         title: 'Bottlenose dolphin sighting',
         sub: `Seen ${when}${o.place ? `, ${o.place}` : ''}`,
+        row: [cap(when), o.place || 'Place not given'],
         text: ['Dolphins live in the harbor all year. They work the tide lines along the channel and follow the shrimp boats into Shem Creek.'],
         note: `Reported on iNaturalist${o.by ? ` by ${o.by}` : ''}${o.license ? ` (${o.license.toUpperCase()})` : ''}.`,
         links: [{ href: `https://www.inaturalist.org/observations/${o.id}`, text: 'See the sighting on iNaturalist' }],
       };
     }).filter((o) => inMap(o)));
+  };
+  // The board lists the wrecks with a story and the dolphin sightings, each while its layer is on.
+  const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+  const drawPlaceLists = () => {
+    const of = (id) => (pins.layers.get(id) || { items: [] }).items;
+    panel.renderPlaces('wreck-list', 'wrecks', 'Shipwrecks', of('wrecks').filter((w) => !w.minor), layers.get('wrecks'), 'No wrecks to show');
+    panel.renderPlaces('dolphin-list', 'dolphins', 'Dolphin sightings', of('dolphins'), layers.get('dolphins'), 'No sightings reported in the last 90 days');
   };
   const drawCurrents = (now = Date.now()) => {
     const d = extras.state.currents.data;
@@ -368,7 +378,10 @@ async function boot() {
       channel.group.visible = on;
       labels.showChannel = on;
     } else if (id === 'aids') aids.setVisible(on);
-    else if (id === 'currents' || id === 'landmarks' || id === 'wrecks' || id === 'dolphins') pins.show(id, on);
+    else if (id === 'currents' || id === 'landmarks' || id === 'wrecks' || id === 'dolphins') {
+      pins.show(id, on);
+      drawPlaceLists();
+    }
     else if (id in panel.show) {
       panel.show[id] = on;
       panel.renderWeather(extras);
@@ -397,6 +410,7 @@ async function boot() {
     panel.renderMarine(extras);
     panel.renderInbound(extras);
     drawDolphins();
+    drawPlaceLists();
     drawCurrents();
   });
   logFeed.onUpdate(() => {

@@ -5,7 +5,7 @@
 import { esc } from '../util.js';
 
 // One small picture per kind, drawn on a 24 by 24 grid.
-const ICONS = {
+export const ICONS = {
   // a star fort
   landmarks: '<path d="M12 3.5l2.3 4.6 5.1.7-3.7 3.6.9 5.1-4.6-2.4-4.6 2.4.9-5.1-3.7-3.6 5.1-.7z" fill="#fff"/>',
   // the chart symbol for a wreck: a hull line crossed by three ribs
