@@ -75,12 +75,19 @@ export class Stage {
     return Math.max((rect.north - rect.south) * pad, ((rect.east - rect.west) * pad) / aspect);
   }
 
-  /** Frame the whole harbor. */
+  /** The tallest view that the imagery still fills from edge to edge, so no empty margin shows. */
+  coverHeight() {
+    const b = this.bounds;
+    const m = 280 * 2; // the imagery fades out over its last 260 m on each side
+    return Math.min(b.north - b.south - m, ((b.east - b.west - m) * this.height) / this.width);
+  }
+
+  /** Frame the whole harbor, or as much of it as fits without showing past the imagery. */
   home(animate = true) {
-    const h = this.fitHeight(HARBOR);
+    this.maxHeight = Math.max(this.coverHeight(), 3000);
+    const h = Math.min(this.fitHeight(HARBOR), this.maxHeight);
     let cx = (HARBOR.west + HARBOR.east) / 2;
     let cy = (HARBOR.south + HARBOR.north) / 2;
-    this.maxHeight = Math.max(h * 1.2, 9000);
     [cx, cy] = this.inside(cx, cy, h);
     if (animate) this.flyTo(cx, cy, h, 1.6);
     else {
@@ -120,7 +127,10 @@ export class Stage {
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     if (first || !this.userMoved) this.home(false);
-    else this.maxHeight = Math.max(this.fitHeight(HARBOR) * 1.2, 9000);
+    else {
+      this.maxHeight = Math.max(this.coverHeight(), 3000);
+      this._clampTarget();
+    }
     return true;
   }
 
