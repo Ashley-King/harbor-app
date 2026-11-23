@@ -16,19 +16,19 @@ Built and run by [Ashley](https://ashleyk.dev).
 
 | Folder | Agent | Model | Effort | Live app |
 | --- | --- | --- | --- | --- |
-| [`claude-code-fable-5.2-medium`](claude-code-fable-5.2-medium) | Claude Code | Fable 5.2 | medium | [harbor-claude-code-fable-52-medium.vercel.app](https://harbor-claude-code-fable-52-medium.vercel.app) |
-| [`claude-code-fable-5.2-xhigh`](claude-code-fable-5.2-xhigh) | Claude Code | Fable 5.2 | xhigh | [harbor-claude-code-fable-52-xhigh.vercel.app](https://harbor-claude-code-fable-52-xhigh.vercel.app) |
-| [`claude-code-opus-5.5-medium`](claude-code-opus-5.5-medium) | Claude Code | Opus 5.5 | medium | [harbor-claude-code-opus-55-medium.vercel.app](https://harbor-claude-code-opus-55-medium.vercel.app) |
-| [`codex-gpt-6-high`](codex-gpt-6-high) | Codex | GPT-6 | high | [harbor-codex-gpt-6-high.vercel.app](https://harbor-codex-gpt-6-high.vercel.app) |
-| [`codex-gpt-6-2-sol-xhigh`](codex-gpt-6-2-sol-xhigh) | Codex | GPT-6.2 Sol | xhigh | [harbor-codex-gpt-6-2-sol-xhigh.vercel.app](https://harbor-codex-gpt-6-2-sol-xhigh.vercel.app) |
-| [`codex-gpt-6.2-astra-xhigh`](codex-gpt-6.2-astra-xhigh) | Codex | GPT-6.2 Astra | xhigh | [harbor-codex-gpt-62-astra-xhigh.vercel.app](https://harbor-codex-gpt-62-astra-xhigh.vercel.app) |
-| [`grok-4.7-high`](grok-4.7-high) | Grok | Grok 4.7 | high | [harbor-grok-47-high.vercel.app](https://harbor-grok-47-high.vercel.app) |
+| [`claude-code-fable-5.2-medium`](claude-code-fable-5.2-medium) | Claude Code | Fable 5.2 | medium | [Open the Fable 5.2 medium app](https://harbor-claude-code-fable-52-medium.vercel.app) |
+| [`claude-code-fable-5.2-xhigh`](claude-code-fable-5.2-xhigh) | Claude Code | Fable 5.2 | xhigh | [Open the Fable 5.2 xhigh app](https://harbor-claude-code-fable-52-xhigh.vercel.app) |
+| [`claude-code-opus-5.5-medium`](claude-code-opus-5.5-medium) | Claude Code | Opus 5.5 | medium | [Open the Opus 5.5 medium app](https://harbor-claude-code-opus-55-medium.vercel.app) |
+| [`codex-gpt-6-high`](codex-gpt-6-high) | Codex | GPT-6 | high | [Open the GPT-6 high app](https://harbor-codex-gpt-6-high.vercel.app) |
+| [`codex-gpt-6-2-sol-xhigh`](codex-gpt-6-2-sol-xhigh) | Codex | GPT-6.2 Sol | xhigh | [Open the GPT-6.2 Sol xhigh app](https://harbor-codex-gpt-6-2-sol-xhigh.vercel.app) |
+| [`codex-gpt-6.2-astra-xhigh`](codex-gpt-6.2-astra-xhigh) | Codex | GPT-6.2 Astra | xhigh | [Open the GPT-6.2 Astra xhigh app](https://harbor-codex-gpt-62-astra-xhigh.vercel.app) |
+| [`grok-4.7-high`](grok-4.7-high) | Grok | Grok 4.7 | high | [Open the Grok 4.7 high app](https://harbor-grok-47-high.vercel.app) |
 
 Some folders got small fixes after the first run. The commit history shows what changed and when.
 
 ## Work in progress
 
-The Fable 5.2 xhigh app is being extended past the eval into a full harbor site at [charlestonharborwatch.com](https://charlestonharborwatch.com). It adds harbor facts, map layers, weather, currents, alerts and a harbor log. That work lives on its own branches, so the eval folders on `main` stay close to what each model shipped.
+Ashley picked the Fable 5.2 xhigh app to keep building. Its original eval deploy is still up as the [Fable 5.2 xhigh app on Vercel](https://harbor-claude-code-fable-52-xhigh.vercel.app). The extended version is a full harbor site at [Charleston Harbor Watch](https://charlestonharborwatch.com). It adds harbor facts, map layers, weather, currents, alerts and a harbor log. That work lives on its own branches, so the eval folders on `main` stay close to what each model shipped.
 
 ## The prompt
 
