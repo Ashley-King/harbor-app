@@ -122,7 +122,7 @@ export class Fleet {
     this.wakeMaterial = new THREE.ShaderMaterial({ vertexShader: WAKE_VERT, fragmentShader: WAKE_FRAG, uniforms: this.wakeUniforms, transparent: true, depthWrite: false, side: THREE.DoubleSide });
     this.kelvinGeometry = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
 
-    this.piers = new PierIndex(harbor.piers);
+    this.piers = new PierIndex(harbor.piers, harbor.pierAreas);
     this._drawn = [];
     this._active = [];
 
@@ -260,7 +260,7 @@ export class Fleet {
     if (still && reportHeading == null && e.lastHeading == null) {
       // No heading from the vessel: lie along the wharf or dock it is at, or failing
       // that the way the hull fits the open water around it.
-      const pier = e.berth ? null : this._pierHeading(here, v, e.size);
+      const pier = e.berth ? null : this._pierHeading(here, v, e);
       if (e.berth) e.assumedHeading = e.berth.bearing;
       else if (pier != null) e.assumedHeading = pier;
       else e.needsFit = here;
@@ -283,16 +283,54 @@ export class Fleet {
 
   /**
    * Heading for a stationary vessel that reports none and sits at a pier or dock:
-   * along the dock. Which end is the bow is taken from its course over ground when
-   * it has one, and is otherwise a guess that the card owns up to.
+   * along the dock. Each dock face within reach is tried both ways round, and each
+   * trial hull is slid clear of the docks exactly as it would be drawn. The pose kept
+   * is the one with the most of the hull alongside its face, the shortest slide and
+   * the least of it left over a dock or the shore: the long face of a pier head beats
+   * the end of the walkway beside it, and a slip beats lying across its finger piers.
+   * Its course over ground breaks a tie between bow and stern, which is otherwise a
+   * guess that the card owns up to.
    */
-  _pierHeading(here, v, size) {
-    const hit = this.piers.nearest(here.x, here.y, size.B + 7);
-    if (!hit) return null;
-    const along = ((Math.atan2(hit.seg.ux, hit.seg.uy) / D2R) + 360) % 360;
-    const ref = v.cog;
-    if (ref != null && Math.abs(angleDiff(ref, along)) > 90) return (along + 180) % 360;
-    return along;
+  _pierHeading(here, v, e) {
+    const L = e.size.L, B = e.size.B;
+    const reach = B + 7;
+    let best = null;
+    for (const s of this.piers.near(here.x, here.y, reach + 12)) {
+      const t = clamp((here.x - s.ax) * s.ux + (here.y - s.ay) * s.uy, 0, s.len);
+      const d = Math.hypot(here.x - (s.ax + s.ux * t), here.y - (s.ay + s.uy * t)) - s.w / 2;
+      if (d > reach) continue;
+      const along = ((Math.atan2(s.ux, s.uy) / D2R) + 360) % 360;
+      for (const hd of [along, (along + 180) % 360]) {
+        const off = this._centreOffset(v, hd, e.unit);
+        const h = hd * D2R;
+        const x = here.x + off.x, y = here.y + off.y;
+        const hull = { e, hd, x, y, x0: x, y0: y, fx: Math.sin(h), fy: Math.cos(h), hl: L / 2, hb: B / 2, walls: [] };
+        const floats = this._offDocks(hull, false);
+        const slide = Math.hypot(hull.x - x, hull.y - y);
+        const mid = (hull.x - s.ax) * s.ux + (hull.y - s.ay) * s.uy;
+        const beside = Math.max(0, Math.min(mid + L / 2, s.len) - Math.max(mid - L / 2, 0));
+        const dry = this._hullDry(here, v, e, hd, hull.x - x, hull.y - y);
+        const score = beside - 2 * Math.max(0, d) - 1.5 * slide - 3 * dry - (floats ? 0 : 12) - (v.cog != null && Math.abs(angleDiff(v.cog, hd)) > 90 ? 0.5 : 0);
+        if (!best || score > best.score) best = { hd, score };
+      }
+    }
+    return best ? best.hd : null;
+  }
+
+  /** How many of 27 points spread over a hull, at a trial heading and shift, are on land or on a dock. */
+  _hullDry(here, v, e, hd, dx = 0, dy = 0) {
+    if (!this.wetAt) return 0;
+    const off = this._centreOffset(v, hd, e.unit);
+    const h = hd * D2R;
+    const L = e.size.L, B = e.size.B;
+    let n = 0;
+    for (let i = -4; i <= 4; i++) {
+      for (const side of [-0.4, 0, 0.4]) {
+        const fx = (i / 8) * L * 0.96, sx = side * B;
+        if (!this._clearAt(here.x + off.x + dx + Math.sin(h) * fx + Math.cos(h) * sx, here.y + off.y + dy + Math.cos(h) * fx - Math.sin(h) * sx)) n++;
+      }
+    }
+    return n;
   }
 
   /**
@@ -351,6 +389,31 @@ export class Fleet {
     }
   }
 
+  /**
+   * A hull lying along a quay or the wall of a slip can report from a few metres inside
+   * the wall. Where one side of the hull is over land and the other is over water, it
+   * is slid sideways toward the water until it floats, by at most 7.5 m. Land here is
+   * read from the same mask that draws the shore, so the hull ends up at the drawn edge.
+   */
+  _offShore(hull) {
+    const wet = this.shoreAt;
+    if (!wet) return;
+    const sx = hull.fy, sy = -hull.fx;                      // toward starboard
+    for (let step = 0; step < 10; step++) {
+      let port = 0, stbd = 0;
+      for (const f of [-0.8, -0.4, 0, 0.4, 0.8]) {
+        const cx = hull.x + hull.fx * hull.hl * f, cy = hull.y + hull.fy * hull.hl * f;
+        if (wet(cx + sx * hull.hb, cy + sy * hull.hb) < 0.5) stbd++;
+        if (wet(cx - sx * hull.hb, cy - sy * hull.hb) < 0.5) port++;
+      }
+      if (!port === !stbd) break;                           // floating, or pinched between two shores
+      const dir = stbd ? -1 : 1;
+      hull.x += sx * dir * 0.75;
+      hull.y += sy * dir * 0.75;
+      addWall(hull, sx * dir, sy * dir);
+    }
+  }
+
   /** A vessel's hull as a rectangle at its newest report: centre, bow direction, half sizes. */
   _hullOf(e) {
     const v = e.v;
@@ -365,8 +428,12 @@ export class Fleet {
     return { e, hd, x, y, x0: x, y0: y, fx: Math.sin(h), fy: Math.cos(h), hl: e.size.L / 2, hb: e.size.B / 2, mass, walls: [], dirty: false };
   }
 
-  /** Slide a hull the shortest way off its wharf and off every pier it overlaps. */
-  _offDocks(hull) {
+  /**
+   * Slide a hull the shortest way off its wharf, the shore and every pier it overlaps.
+   * True when it ends up floating clear. With `search`, a hull that the pushes cannot
+   * free is moved to the nearest open water instead.
+   */
+  _offDocks(hull, search = true) {
     const e = hull.e;
     if (e.berth) {
       const w = this._clearWharf(hull.x, hull.y, hull.hd, e.size, e.berth);
@@ -376,6 +443,7 @@ export class Fleet {
         addWall(hull, e.berth.out[0], e.berth.out[1]);
       }
     }
+    if (!e.berth) this._offShore(hull);
     const sx = hull.x, sy = hull.y;
     const deepest = () => {
       let worst = null;
@@ -388,12 +456,13 @@ export class Fleet {
     const walls = hull.walls.length;
     for (let pass = 0; pass < 8; pass++) {
       const worst = deepest();
-      if (!worst) return;
+      if (!worst) return true;
       hull.x += worst.x;
       hull.y += worst.y;
       addWall(hull, worst.x / worst.depth, worst.y / worst.depth);
     }
-    if (!deepest()) return;
+    if (!deepest()) return true;
+    if (!search) return false;
     // Boxed in: the report sits where docks meet, and each push off one dock lands on
     // another. Look around the report for the nearest spot of open water that takes the hull.
     hull.walls.length = walls;
@@ -403,36 +472,93 @@ export class Fleet {
         const t = (i / n) * Math.PI * 2;
         hull.x = sx + Math.cos(t) * r;
         hull.y = sy + Math.sin(t) * r;
-        if (!deepest()) return;
+        if (!deepest()) return true;
       }
     }
     hull.x = sx;
     hull.y = sy;
+    return false;
   }
 
   /**
-   * A stationary ship that reports no heading still has to be drawn pointing some way.
-   * Its course over ground is noise at zero speed, so try every 15 degrees and keep the
-   * direction that leaves the most of the hull over water (a ship at a pier then lies
-   * along the pier). Which end is the bow stays a guess, and the card says so.
+   * A stationary ship that reports no heading still has to be drawn pointing some way,
+   * and its course over ground is noise at zero speed. In a slip, a creek or alongside
+   * a quay it lies along the walls (see _waterAxis), with the bow at the end that puts
+   * more of the hull alongside them. In open water every 15 degrees is tried and the
+   * direction that leaves the most of the hull over water is kept, or a stationary
+   * neighbour's heading when that fits as well. Which end is the bow stays a guess,
+   * and the card says so.
    */
   _fitHeading(here, v, self) {
     const water = this.waterAt;
     const fallback = v.cog ?? 0;
     if (!water) return fallback;
     const L = self.size.L, B = self.size.B;
-    const score = (hd) => {
+    // Points along the hull for a trial heading: fn(x, y, station, side).
+    const along = (hd, sides, fn) => {
       const off = this._centreOffset(v, hd, self.unit);
       const h = hd * D2R;
-      let sum = 0;
       for (let i = -4; i <= 4; i++) {
-        for (const side of [-0.4, 0.4]) {
-          const fx = (i / 8) * L, sx = side * B;
-          sum += water(here.x + off.x + Math.sin(h) * fx + Math.cos(h) * sx, here.y + off.y + Math.cos(h) * fx - Math.sin(h) * sx);
+        for (const side of sides) {
+          const fx = (i / 8) * L;
+          fn(here.x + off.x + Math.sin(h) * fx + Math.cos(h) * side, here.y + off.y + Math.cos(h) * fx - Math.sin(h) * side);
         }
       }
+    };
+    const score = (hd) => {
+      let sum = 0;
+      along(hd, [-0.4 * B, 0.4 * B], (x, y) => {
+        sum += this.piers.nearest(x, y, 0) ? 0 : water(x, y);
+      });
       return sum;
     };
+    // A close neighbour that does report its heading is the best evidence there is:
+    // boats in the same row of slips or on the same dock lie parallel.
+    const neighbour = (within) => {
+      let near = null;
+      for (const o of this.entities.values()) {
+        if (o === self || o.gone || o.lastHeading == null || o.state === 'underway' || !o.path.length) continue;
+        const p = o.path[o.path.length - 1];
+        const d = Math.hypot(p.x - here.x, p.y - here.y);
+        if (d < within && (!near || d < near.d)) near = { d, hdg: o.lastHeading };
+      }
+      return near;
+    };
+    const axis = this._waterAxis(here.x, here.y, B);
+    if (axis != null) {
+      const close = neighbour(150);
+      if (close && Math.abs(Math.abs(angleDiff(close.hdg, axis.toward)) - 90) < 35) {
+        // Lying across the lane beside a neighbour that reports the same: a row of slips.
+        const a = close.hdg, b = (close.hdg + 180) % 360;
+        const sa = score(a), sb = score(b);
+        if (Math.max(sa, sb) >= 15) return sb > sa + 0.6 ? b : a;
+      }
+      // Along the walls. The bow goes to the end that keeps the hull's middle line over
+      // water and puts more of the hull alongside a wall or dock. When both ends do as
+      // well, it points down the longer run of water: the way out.
+      const a = axis.toward, b = (axis.toward + 180) % 360;
+      const dry = (hd) => {
+        let n = 0;
+        along(hd, [0], (x, y) => {
+          if (!this._clearAt(x, y)) n++;
+        });
+        return n;
+      };
+      const beside = (hd) => {
+        let n = 0;
+        const reach = B / 2 + 6;
+        const off = this._centreOffset(v, hd, self.unit);
+        const h = hd * D2R;
+        for (let i = -4; i <= 4; i++) {
+          const x = here.x + off.x + Math.sin(h) * (i / 8) * L, y = here.y + off.y + Math.cos(h) * (i / 8) * L;
+          if (!this._clearAt(x + Math.cos(h) * reach, y - Math.sin(h) * reach) || !this._clearAt(x - Math.cos(h) * reach, y + Math.sin(h) * reach)) n++;
+        }
+        return n;
+      };
+      const da = dry(a), db = dry(b);
+      if (da >= 3 !== db >= 3) return da >= 3 ? b : a;
+      return beside(b) > beside(a) ? b : a;
+    }
     let best = fallback, bestScore = -1;
     for (let k = 0; k < 24; k++) {
       const hd = (Math.round(fallback / 15) * 15 + k * 15) % 360;
@@ -442,20 +568,84 @@ export class Fleet {
         best = hd;
       }
     }
-    // Ships at the same pier lie parallel: copy a stationary neighbour's reported heading when it fits as well.
-    let near = null;
-    for (const o of this.entities.values()) {
-      if (o === self || o.gone || o.lastHeading == null || o.state === 'underway' || !o.path.length) continue;
-      const p = o.path[o.path.length - 1];
-      const d = Math.hypot(p.x - here.x, p.y - here.y);
-      if (d < 380 && (!near || d < near.d)) near = { d, hdg: o.lastHeading };
-    }
+    const near = neighbour(380);
     if (near) {
       for (const hd of [near.hdg, (near.hdg + 180) % 360]) {
         if (score(hd) >= bestScore - 0.6) return hd;
       }
     }
     return best;
+  }
+
+  /** True where a hull can float: water, and no pier or dock. */
+  _clearAt(x, y) {
+    return this.wetAt(x, y) > 0.5 && !this.piers.nearest(x, y, 0);
+  }
+
+  /**
+   * The lie of the water a vessel sits in. From the reported position, open water is
+   * followed both ways along every 5 degrees until it meets land or a dock. In a slip,
+   * a creek or beside a quay the longest run is along the walls, which is how a boat
+   * ties up there. Three runs are followed side by side, half a beam apart, and the
+   * middle one of the three counts, so a boat lying hard against a wall still reads
+   * the wall's direction. Returns { toward }: the bearing of the longest run, pointing
+   * down its longer arm. Null in open water, where every run is as long as the next.
+   */
+  _waterAxis(x, y, beam) {
+    if (!this.wetAt) return null;
+    const CAP = 160, STEP = 3;
+    if (!this._clearAt(x, y)) {
+      // The report itself reads as land or dock (a few metres of error): start from the nearest water.
+      let found = false;
+      for (let r = 5; r <= 15 && !found; r += 5) {
+        for (let k = 0; k < 12 && !found; k++) {
+          const t = (k / 12) * Math.PI * 2;
+          if (this._clearAt(x + Math.cos(t) * r, y + Math.sin(t) * r)) {
+            x += Math.cos(t) * r;
+            y += Math.sin(t) * r;
+            found = true;
+          }
+        }
+      }
+      if (!found) return null;
+    }
+    const run = (ox, oy, dx, dy) => {
+      let d = 0;
+      while (d < CAP && this._clearAt(ox + dx * (d + STEP), oy + dy * (d + STEP))) d += STEP;
+      return d;
+    };
+    const half = Math.max(1.5, beam / 2);
+    const lanes = [];
+    let longest = 0, shortest = Infinity;
+    for (let k = 0; k < 36; k++) {
+      const a = k * 5 * D2R;
+      const dx = Math.sin(a), dy = Math.cos(a);
+      const runs = [];
+      for (const s of [-1, 0, 1]) {
+        const ox = x + dy * half * s, oy = y - dx * half * s;
+        if (s !== 0 && !this._clearAt(ox, oy)) continue;         // that side is the wall itself
+        const ahead = run(ox, oy, dx, dy), astern = run(ox, oy, -dx, -dy);
+        runs.push({ ahead, astern, len: ahead + astern });
+      }
+      runs.sort((p, q) => p.len - q.len);
+      const pick = runs.length === 3 ? runs[1] : runs[runs.length - 1];
+      lanes.push({ a, ahead: pick.ahead, astern: pick.astern, len: pick.len });
+      longest = Math.max(longest, pick.len);
+      shortest = Math.min(shortest, pick.len);
+    }
+    if (longest - shortest < CAP * 0.5) return null;            // open water, or shut in evenly all round
+    // Middle of the directions that are nearly as long as the longest (an axis, so angles are doubled).
+    let cx = 0, cy = 0;
+    const floor = longest * 0.85;
+    for (const l of lanes) {
+      if (l.len < floor) continue;
+      const w = l.len - floor + 1;
+      cx += Math.cos(2 * l.a) * w;
+      cy += Math.sin(2 * l.a) * w;
+    }
+    const mid = ((Math.atan2(cy, cx) / 2 / D2R) + 360) % 180;
+    const lane = lanes[Math.round(mid / 5) % 36];
+    return { toward: lane.ahead >= lane.astern ? mid : (mid + 180) % 360 };
   }
 
   /**

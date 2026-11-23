@@ -407,13 +407,16 @@ def measured_width(line):
 
 
 def build_piers():
-    """Piers and docks as centre lines with a width, so moored boats can be kept off them.
+    """Piers and docks, so moored boats can be kept off them and lie along them.
 
-    OpenStreetMap draws most piers as a single line. For piers longer than 60 m the
-    width is measured on the aerial photo. Shorter ones get a typical width. Piers
-    drawn as outlines are reduced to their long axis.
+    OpenStreetMap draws most piers as a single line: those become centre lines with a
+    width. For piers longer than 60 m the width is measured on the aerial photo, and
+    shorter ones get a typical width. A pier drawn as a plain rectangle is reduced to
+    its long axis. A pier drawn as any other outline (an L, a T, a dock with a
+    breakwater arm) is kept as that outline, with its typical width alongside.
     """
     out = []
+    areas = []
     measured = 0
     for e in OSM:
         t = e.get("tags", {})
@@ -432,11 +435,20 @@ def build_piers():
             b = (arr - c) @ minor
             length, width = a.max() - a.min(), b.max() - b.min()
             mid = c + major * (a.max() + a.min()) / 2 + minor * (b.max() + b.min()) / 2
-            if length > 2 and abs(area(pts)) / max(1e-6, length * width) > 0.55:
+            if length > 2 and abs(area(pts)) / max(1e-6, length * width) > 0.8:
                 p0, p1 = mid - major * length / 2, mid + major * length / 2
                 out.append({"p": [round(float(v), 1) for v in (*p0, *p1)], "w": round(float(max(width, 1.5)), 1)})
                 continue
-            line, width = simplify(pts, 0.6), 1.2
+            ring = simplify_ring(pts, 0.3)
+            if len(ring) < 3 or abs(area(ring)) < 4:
+                continue
+            if area(ring) < 0:
+                ring = ring[::-1]                              # counter-clockwise, so the inside is on the left
+            around = sum(math.hypot(ring[i][0] - ring[i - 1][0], ring[i][1] - ring[i - 1][1]) for i in range(len(ring)))
+            # 2 x area / perimeter is the width of a long thin shape, whatever its bends
+            typical = min(14.0, max(1.5, 2 * abs(area(ring)) / around))
+            areas.append({"ring": [round(float(v), 1) for q in ring for v in q], "t": round(typical, 1)})
+            continue
         else:
             line = simplify(pts, 0.6)
             total = sum(math.hypot(line[i + 1][0] - line[i][0], line[i + 1][1] - line[i][1]) for i in range(len(line) - 1))
@@ -448,9 +460,8 @@ def build_piers():
                     width = round(min(16.0, max(2.4, m - 1.4)), 1)
                     measured += 1
         out.append({"p": [v for q in line for v in q], "w": width})
-    print("piers", len(out), "with", sum(len(x["p"]) // 2 for x in out), "points;", measured, "widths measured on the photo")
-    return out
-
+    print("piers", len(out), "lines with", sum(len(x["p"]) // 2 for x in out), "points;", measured, "widths measured on the photo;", len(areas), "outlines with", sum(len(x["ring"]) // 2 for x in areas), "points")
+    return out, areas
 
 # Names set the way a nautical chart sets them: water in italics, land upright.
 LABELS = [
@@ -480,6 +491,7 @@ LABELS = [
 def main():
     reaches = build_channel()
     terminals = build_terminals()
+    piers, pier_areas = build_piers()
     data = {
         "source": {
             "channel": "US Army Corps of Engineers, National Channel Framework",
@@ -491,7 +503,8 @@ def main():
         "terminals": terminals,
         "cranes": build_cranes(terminals),
         "aids": build_aids(),
-        "piers": build_piers(),
+        "piers": piers,
+        "pierAreas": pier_areas,
         "labels": [{"text": t, "at": W(la, lo), "kind": k, "tier": tier} for t, la, lo, k, tier in LABELS],
     }
     path = os.path.join(OUT, "harbor.json")

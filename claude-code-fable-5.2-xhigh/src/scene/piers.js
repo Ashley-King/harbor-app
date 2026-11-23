@@ -6,7 +6,11 @@
 const CELL = 120;
 
 export class PierIndex {
-  constructor(piers = []) {
+  /**
+   * piers: centre lines with a width, [{ p: [x0, y0, x1, y1, ...], w }].
+   * areas: piers drawn as outlines, [{ ring: [x0, y0, ...] counter-clockwise, t: typical width }].
+   */
+  constructor(piers = [], areas = []) {
     this.segs = [];
     this.grid = new Map();
     this._stamp = 0;
@@ -14,6 +18,38 @@ export class PierIndex {
       const c = p.p;
       for (let i = 0; i + 3 < c.length; i += 2) this._add(c[i], c[i + 1], c[i + 2], c[i + 3], p.w);
     }
+    // An outline is covered edge by edge: each edge becomes a strip lying inside the
+    // outline, as deep as the pier is wide at that edge. A hull that overlaps the edge
+    // is then pushed outward, and a boat beside it lies along it.
+    for (const area of areas) {
+      const r = area.ring, n = r.length / 2;
+      for (let i = 0; i < n; i++) {
+        const ax = r[i * 2], ay = r[i * 2 + 1], bx = r[((i + 1) % n) * 2], by = r[((i + 1) % n) * 2 + 1];
+        const len = Math.hypot(bx - ax, by - ay);
+        if (len < 0.8) continue;
+        const nx = -(by - ay) / len, ny = (bx - ax) / len;                 // inward: the inside is on the left
+        const deep = Math.min(14, PierIndex._across(r, i, (ax + bx) / 2, (ay + by) / 2, nx, ny) ?? area.t);
+        if (deep < 0.5) continue;
+        this._add(ax + (nx * deep) / 2, ay + (ny * deep) / 2, bx + (nx * deep) / 2, by + (ny * deep) / 2, deep);
+      }
+    }
+  }
+
+  /** Distance from a point on edge `skip` of a ring straight across to the far side of the outline. */
+  static _across(r, skip, x, y, nx, ny) {
+    const n = r.length / 2;
+    let best = null;
+    for (let i = 0; i < n; i++) {
+      if (i === skip) continue;
+      const ax = r[i * 2] - x, ay = r[i * 2 + 1] - y, bx = r[((i + 1) % n) * 2] - x, by = r[((i + 1) % n) * 2 + 1] - y;
+      const ex = bx - ax, ey = by - ay;
+      const det = ex * ny - ey * nx;
+      if (Math.abs(det) < 1e-9) continue;
+      const t = (ex * ay - ey * ax) / det;              // distance along the inward normal
+      const u = (nx * ay - ny * ax) / det;              // position along the other edge
+      if (t > 0.05 && u >= 0 && u <= 1 && (best == null || t < best)) best = t;
+    }
+    return best;
   }
 
   _add(ax, ay, bx, by, w) {

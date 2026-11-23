@@ -67,7 +67,7 @@ For each ship that is under way, the function also fetches the track it actually
 All free, no keys. Credits also appear on screen.
 
 - Aerial imagery: USGS The National Map, USDA NAIP orthophotos (public domain). A zoom 14 mosaic ships with the app. Sharper tiles to zoom 16 load from the USGS tile cache as you zoom.
-- Close-up imagery: the USGS cache stops at about 2 m per pixel, so the app ships its own 0.5 m tiles for the terminals, the banks of the shipping channel, the marinas, Patriots Point, Fort Sumter, Castle Pinckney and the Coast Guard base. They are the same 2021 NAIP photos at full resolution, read from the public NAIP archive on Microsoft's Planetary Computer (no key) and colour-matched to the USGS tiles. They load from this app's own domain, so nothing slow is in the way.
+- Close-up imagery: the USGS cache stops at about 2 m per pixel, so the app ships its own 0.5 m tiles for the terminals, the banks of the shipping channel, the marinas, Patriots Point, Fort Sumter, Castle Pinckney, the Coast Guard base, the Fort Johnson boat slip, Shem Creek and Toler's Cove. They are the same 2021 NAIP photos at full resolution, read from the public NAIP archive on Microsoft's Planetary Computer (no key) and colour-matched to the USGS tiles. They load from this app's own domain, so nothing slow is in the way.
 - Roads, terminals, piers, cranes, bridges, buoys, water outlines: OpenStreetMap contributors (ODbL), via the Overpass API.
 - Shipping channel outline and reach names: US Army Corps of Engineers, National Channel Framework (public domain).
 - Sun and moon positions: computed in the browser.
@@ -80,12 +80,12 @@ The files under `public/data` are built from those sources by the scripts in `to
 - A vessel that reports no hull size is drawn at a typical size for its kind. The card shows its size as unknown and says the drawn size is a stand-in.
 - Paint schemes, container loads and deck details are generic for each kind of ship. AIS does not describe them.
 - Close-up imagery is 0.5 m per pixel around the port (see above). Away from the terminals and the channel the deepest imagery is about 2 m per pixel, so that land is soft at the closest zoom.
-- Some transponders report no heading. A stationary ship with no heading is drawn lying along its wharf, or the way its hull fits the open water around it, and the card says so. Bow and stern may be swapped in that case.
-- A moored hull that GPS error would place partly on a wharf or dock is moved the shortest way off it, by at most 30 m. A moored boat that reports no heading is drawn lying along its dock.
+- Some transponders report no heading. A stationary vessel with no heading is drawn lying along its wharf or dock. Away from a dock it lies along the walls of the slip, creek or quay it sits in, found by following open water from its position until it meets land. In open water it takes the heading of a close neighbour that reports one, or the way its hull best fits the water around it. The card says which, and bow and stern may be swapped.
+- A moored hull that GPS error would place partly on a wharf, a dock or the shore is moved the shortest way off it, by at most 30 m. Where a boat with no heading could lie along more than one dock face, each is tried and the pose that needs the shortest move and puts the most of the hull alongside is kept.
 - Two moored hulls that the reports would draw on top of each other are pushed apart by the shortest move. The smaller one gives way, and neither is pushed back onto a dock. When a vessel is drawn 3 m or more from its reported position, its card says how far.
 - A moving vessel follows the track it reported. Where that track runs through another drawn hull, the two are held apart for as long as they would overlap: the smaller one gives way, and a moving boat steers round a moored one of its own size.
 - Some yacht owners type their boat's size into the transponder in feet. A sailing or pleasure craft is read as feet only when its size cannot be a real hull in metres: 30 m or longer, no IMO number, no draught, and far too wide for its length. The card shows the reported figures and the drawn size. Every other size is drawn exactly as reported.
-- Docks and piers are drawn as plain slabs from their OpenStreetMap lines, with widths measured on the photo for the longer ones. The photo is left out for them because it shows every boat that was tied up on the day it was flown. Docks missing from OpenStreetMap are missing here.
+- Docks and piers are drawn as plain slabs from their OpenStreetMap lines and outlines, with widths measured on the photo for the longer lines. The photo is left out for them because it shows every boat that was tied up on the day it was flown. Docks missing from OpenStreetMap are missing here.
 - A small craft that has no track and whose last two reports are on opposite sides of land is moved in one step, so it is never drawn sailing over land.
 - Not for navigation.
 

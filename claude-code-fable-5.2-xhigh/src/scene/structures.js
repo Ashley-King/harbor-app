@@ -88,6 +88,18 @@ export function buildPiers(scene, harbor, glowUniform) {
       b.box((ax + bx) / 2, h / 2 - 0.2, -(ay + by) / 2, len + pier.w * 0.9, h + 0.4, pier.w, side, { yaw: Math.atan2(by - ay, bx - ax), top: col, noBottom: true });
     }
   }
+  // Piers that the map draws as outlines (an L, a T, a dock with a breakwater arm).
+  for (const area of harbor.pierAreas || []) {
+    const r = area.ring;
+    const big = area.t >= 6;
+    const h = big ? 2.2 : 1.1;
+    const tone = ((k++ * 37) % 17) / 17;
+    const col = big ? [0.5 + tone * 0.06, 0.5 + tone * 0.05, 0.47 + tone * 0.05] : [0.36 + tone * 0.08, 0.33 + tone * 0.07, 0.28 + tone * 0.06];
+    const side = big ? [0.3, 0.3, 0.29] : [0.2, 0.18, 0.15];
+    const outline = [];
+    for (let i = 0; i + 1 < r.length; i += 2) outline.push([r[i], -r[i + 1]]);
+    b.prism(outline, -0.4, h, side, col);
+  }
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0 });
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uGlow = glowUniform;

@@ -56,7 +56,15 @@ function waterSamplers(image, b) {
     const v = Math.floor(((b.north - y) / (b.north - b.south)) * h);
     return u < 0 || v < 0 || u >= w || v >= h ? 0 : arr[v * w + u] / 255;
   };
-  return { wet: lookup(wet), open: lookup(open) };
+  // The same mask read smoothly between its pixels, which is where the shore is drawn.
+  const soft = (x, y) => {
+    const fu = ((x - b.west) / (b.east - b.west)) * w - 0.5, fv = ((b.north - y) / (b.north - b.south)) * h - 0.5;
+    const u0 = Math.floor(fu), v0 = Math.floor(fv);
+    if (u0 < 0 || v0 < 0 || u0 >= w - 1 || v0 >= h - 1) return 0;
+    const a = fu - u0, c = fv - v0, i = v0 * w + u0;
+    return ((wet[i] * (1 - a) + wet[i + 1] * a) * (1 - c) + (wet[i + w] * (1 - a) + wet[i + w + 1] * a) * c) / 255;
+  };
+  return { wet: lookup(wet), open: lookup(open), soft };
 }
 
 function savedMode() {
@@ -105,6 +113,7 @@ async function boot() {
   const water = waterSamplers(mask.image, geo.base);
   fleet.waterAt = water.open;
   fleet.wetAt = water.wet;
+  fleet.shoreAt = water.soft;
   buildCranes(stage.scene, harbor, fleet.glow);
   buildPiers(stage.scene, harbor, fleet.glow);
   const channel = buildChannel(stage.scene, harbor, env.uniforms);

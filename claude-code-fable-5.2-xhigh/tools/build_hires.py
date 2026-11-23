@@ -59,6 +59,9 @@ EXTRA = [                           # lat, lon, radius m
     (32.7523, -79.8747, 260),       # Fort Sumter
     (32.7737, -79.9110, 220),       # Castle Pinckney
     (32.7743, -79.9440, 320),       # Coast Guard Sector Charleston
+    (32.7520, -79.8985, 330),       # Fort Johnson boat slip (research vessels)
+    (32.7905, -79.8842, 500),       # Shem Creek (shrimp boats and docks)
+    (32.7745, -79.8466, 330),       # Toler's Cove Marina
 ]
 
 base = json.load(open(os.path.join(DATA, "geo.json")))["base"]
