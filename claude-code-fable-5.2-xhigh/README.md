@@ -10,7 +10,7 @@ An overhead view of the large ships in Charleston Harbor, South Carolina, drawn 
 ## What you see
 
 - The whole harbor from the jetties to the Wando Welch and North Charleston terminals, north up, on USGS aerial photos.
-- Every large ship (AIS types 60 to 89, or longer than 150 m) as a 3D model of its kind, scaled to its reported length and beam and turned to its heading. Tugs and pilot boats are small 3D boats. Everything else is a faint mark that you can hide.
+- Every vessel as a 3D model of its kind, scaled to its reported length and beam and turned to its heading: container ships, tankers, car carriers, bulk carriers, cruise ships, tugs, pilot boats, and also sailing yachts, motor yachts, fishing boats, patrol and rescue boats, workboats and dredges. A checkbox hides the small craft.
 - Night view with street, terminal, bridge, crane and dock lights, and navigation lights on every ship: red to port, green to starboard, white masthead and stern lights. Day view with the real sun direction and shadows.
 - The view follows Charleston's real sunrise and sunset. The Auto, Day and Night buttons hold either view.
 - A side panel with the ships at each container terminal, ships under way, other berths, the tide at Charleston and the clearance under the Ravenel Bridge.
@@ -53,7 +53,7 @@ The browser calls one endpoint in this app, `/api/harbor`, every 10 minutes. Tha
 
 Rules the app follows:
 
-- Only vessels in the live feed are drawn. The aerial photos show the ships that were in port on the day they were flown, so the water is redrawn by a shader and those photographed ships are removed.
+- Only vessels in the live feed are drawn. The aerial photos show the ships and boats that were in port on the day they were flown, so the water is redrawn by a shader and those photographed vessels are removed, in the marinas too.
 - No sample or stored ship data exists anywhere in the app.
 - If a feed fails, the last good data stays on screen, marked stale with the time it was fetched. The next 10 minute refresh tries again.
 - A vessel not heard for 3 hours is drawn dimmed. A vessel not heard for 24 hours is not drawn.
@@ -67,7 +67,7 @@ For each ship that is under way, the function also fetches the track it actually
 All free, no keys. Credits also appear on screen.
 
 - Aerial imagery: USGS The National Map, USDA NAIP orthophotos (public domain). A zoom 14 mosaic ships with the app. Sharper tiles to zoom 16 load from the USGS tile cache as you zoom.
-- Close-up imagery: the USGS cache stops at about 2 m per pixel, so the app ships its own 0.5 m tiles for the terminals, the banks of the shipping channel, Patriots Point, Fort Sumter, Castle Pinckney and the Coast Guard base. They are the same 2021 NAIP photos at full resolution, read from the public NAIP archive on Microsoft's Planetary Computer (no key) and colour-matched to the USGS tiles. They load from this app's own domain, so nothing slow is in the way.
+- Close-up imagery: the USGS cache stops at about 2 m per pixel, so the app ships its own 0.5 m tiles for the terminals, the banks of the shipping channel, the marinas, Patriots Point, Fort Sumter, Castle Pinckney and the Coast Guard base. They are the same 2021 NAIP photos at full resolution, read from the public NAIP archive on Microsoft's Planetary Computer (no key) and colour-matched to the USGS tiles. They load from this app's own domain, so nothing slow is in the way.
 - Roads, terminals, piers, cranes, bridges, buoys, water outlines: OpenStreetMap contributors (ODbL), via the Overpass API.
 - Shipping channel outline and reach names: US Army Corps of Engineers, National Channel Framework (public domain).
 - Sun and moon positions: computed in the browser.
@@ -76,11 +76,14 @@ The files under `public/data` are built from those sources by the scripts in `to
 
 ## Honest limits
 
-- AIS gives a broad type only. Tankers, passenger vessels, tugs and pilot boats are drawn from the AIS type. For cargo ships the model (container ship, car carrier, bulk carrier, general cargo) is an estimate from the name, the berth and the size, and the card says which.
+- AIS gives a broad type only. Vessels whose type names their kind (tanker, passenger, tug, pilot, sailing, pleasure craft, fishing, dredger, military, law enforcement, rescue) are drawn from it. For cargo ships the model (container ship, car carrier, bulk carrier, general cargo) is an estimate from the name, the berth and the size, and the card says which. A vessel with no usable type is drawn as a plain workboat or small motor boat, and the card says that too.
+- A vessel that reports no hull size is drawn at a typical size for its kind. The card shows its size as unknown and says the drawn size is a stand-in.
 - Paint schemes, container loads and deck details are generic for each kind of ship. AIS does not describe them.
 - Close-up imagery is 0.5 m per pixel around the port (see above). Away from the terminals and the channel the deepest imagery is about 2 m per pixel, so that land is soft at the closest zoom.
 - Some transponders report no heading. A stationary ship with no heading is drawn lying along its wharf, or the way its hull fits the open water around it, and the card says so. Bow and stern may be swapped in that case.
-- A berthed hull that GPS error would place partly inside the wharf is moved straight off the wharf face until it clears, by at most 30 m.
+- A moored hull that GPS error would place partly on a wharf or dock is moved the shortest way off it, by at most 30 m. A moored boat that reports no heading is drawn lying along its dock.
+- Docks and piers are drawn as plain slabs from their OpenStreetMap lines, with widths measured on the photo for the longer ones. The photo is left out for them because it shows every boat that was tied up on the day it was flown. Docks missing from OpenStreetMap are missing here.
+- A small craft that has no track and whose last two reports are on opposite sides of land is moved in one step, so it is never drawn sailing over land.
 - Not for navigation.
 
 ## Layout

@@ -31,8 +31,11 @@ export class Panel {
     });
     $('toggle-others').addEventListener('change', (ev) => onToggleOthers(ev.target.checked));
     this.tugsOpen = false;
+    this.smallOpen = false;
     this.listEl.addEventListener('toggle', (ev) => {
-      if (ev.target.matches('details')) this.tugsOpen = ev.target.open;
+      if (!ev.target.matches('details')) return;
+      if (ev.target.dataset.list === 'small') this.smallOpen = ev.target.open;
+      else this.tugsOpen = ev.target.open;
     }, true);
   }
 
@@ -126,7 +129,7 @@ export class Panel {
     const ents = [...fleet.entities.values()].filter((e) => !e.gone);
     const ships = ents.filter((e) => e.group === 'ship');
     const work = ents.filter((e) => e.group === 'tug' || e.group === 'pilot');
-    const others = ents.filter((e) => e.group === 'other').length;
+    const small = ents.filter((e) => e.group === 'other');
     const bySize = (a, b) => (b.v.length || 0) - (a.v.length || 0) || String(a.v.name).localeCompare(String(b.v.name));
     const row = (e, note) => {
       const v = e.v;
@@ -135,7 +138,7 @@ export class Panel {
       const size = v.length != null ? `${Math.round(v.length)} m` : 'size unknown';
       const state = e.stale ? `heard ${ago(e.seenMs, now)}` : note;
       return `<li><button type="button" class="ship${e.stale ? ' is-stale' : ''}" data-mmsi="${v.mmsi}" data-kind="${e.group}" aria-current="${selected === v.mmsi}">
-        ${hullIcon(v.length)}
+        ${hullIcon(e.size ? e.size.L : v.length)}
         <span class="txt"><span class="name">${esc(v.name || `MMSI ${v.mmsi}`)}</span><span class="what">${esc(what)}</span></span>
         <span class="size">${esc(size)}<small>${esc(state)}</small></span></button></li>`;
     };
@@ -173,11 +176,17 @@ export class Panel {
       const tugs = work.filter((e) => e.group === 'tug').length;
       const pilots = work.length - tugs;
       const label = [tugs ? `${tugs} ${tugs === 1 ? 'tug' : 'tugs'}` : '', pilots ? `${pilots} ${pilots === 1 ? 'pilot boat' : 'pilot boats'}` : ''].filter(Boolean).join(', ');
-      html += `<details class="group"${this.tugsOpen ? ' open' : ''}><summary><h2>Tugs and pilot boats<span class="count">${esc(label)}</span></h2></summary><ul class="ship-list">`;
+      html += `<details class="group" data-list="tugs"${this.tugsOpen ? ' open' : ''}><summary><h2>Tugs and pilot boats<span class="count">${esc(label)}</span></h2></summary><ul class="ship-list">`;
       html += work.sort((a, b) => (a.state === 'underway' ? 0 : 1) - (b.state === 'underway' ? 0 : 1) || bySize(a, b)).map((e) => row(e, stateNote(e))).join('');
       html += '</ul></details>';
     }
-    if (others) html += `<div class="group"><p class="empty">${others} small craft and other vessels are also reporting. They are drawn as faint marks.</p></div>`;
+    if (small.length) {
+      const moving = small.filter((e) => e.state === 'underway').length;
+      const label = `${small.length}${moving ? `, ${moving} under way` : ''}`;
+      html += `<details class="group" data-list="small"${this.smallOpen ? ' open' : ''}><summary><h2>Small craft<span class="count">${esc(label)}</span></h2></summary><ul class="ship-list">`;
+      html += small.sort((a, b) => (a.state === 'underway' ? 0 : 1) - (b.state === 'underway' ? 0 : 1) || bySize(a, b)).map((e) => row(e, stateNote(e))).join('');
+      html += '</ul></details>';
+    }
     this.listEl.innerHTML = html;
   }
 

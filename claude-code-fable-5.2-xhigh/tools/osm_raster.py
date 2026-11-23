@@ -108,8 +108,8 @@ def sea(seeds):
     return ndimage.binary_dilation(out, iterations=2)
 
 
-def structures():
-    """Piers, breakwaters and road bridges: things that stand in or over the water."""
+def structures(piers=True):
+    """Breakwaters and road bridges, and optionally piers: things that stand in or over the water."""
     d = json.load(open(os.path.join(CACHE, "osm_features.json")))
     img = Image.new("L", (W, H), 0)
     dr = ImageDraw.Draw(img)
@@ -125,6 +125,8 @@ def structures():
         p = pts(g)
         closed = len(g) >= 4 and (g[0]["lat"], g[0]["lon"]) == (g[-1]["lat"], g[-1]["lon"])
         mm = t.get("man_made")
+        if mm == "pier" and not piers:
+            continue
         if mm in ("pier", "breakwater", "groyne", "quay"):
             if closed and (t.get("area") == "yes" or mm == "pier" and len(g) > 4):
                 dr.polygon(p, fill=255)

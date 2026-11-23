@@ -61,3 +61,10 @@ def range_merc_bounds(z, rng):
 
 def merc_to_world(mx, my):
     return ((mx - merc_x(LON0)) * K, (my - merc_y(LAT0)) * K)
+
+
+def to_latlon(x, y):
+    """Local metres (east, north) -> (lat, lon)."""
+    mx = x / K + merc_x(LON0)
+    my = y / K + merc_y(LAT0)
+    return math.degrees(math.atan(math.sinh(my / R))), math.degrees(mx / R)

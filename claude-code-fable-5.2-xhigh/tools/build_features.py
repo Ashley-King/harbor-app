@@ -6,11 +6,13 @@ Everything is real map data, converted to the app's local metre frame (x east, y
   terminals  - terminal outlines and their wharf faces (OpenStreetMap + the water mask)
   cranes     - ship-to-shore crane positions (OpenStreetMap; North Charleston read off the imagery)
   aids       - lit buoys and beacons (OpenStreetMap seamarks)
+  piers      - pier and dock centre lines with widths (OpenStreetMap)
   labels     - names of places, as on a nautical chart
 """
 import os
 import json
 import math
+import urllib.request
 
 import numpy as np
 from PIL import Image
@@ -341,6 +343,115 @@ def build_aids():
     return aids
 
 
+USGS_TILE = "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}"
+_tiles = {}
+
+
+def photo_luma(x, y, z=16):
+    """Brightness of the aerial photo at a world position (zoom-16 USGS tiles, cached on disk)."""
+    lat, lon = geo.to_latlon(x, y)
+    fx, fy = geo.tile_xy(lat, lon, z)
+    tx, ty = int(fx), int(fy)
+    key = (tx, ty)
+    if key not in _tiles:
+        path = os.path.join(CACHE, "tiles", str(z), f"{tx}_{ty}.jpg")
+        try:
+            if not os.path.exists(path) or os.path.getsize(path) < 500:
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                req = urllib.request.Request(USGS_TILE.format(z=z, x=tx, y=ty), headers={"User-Agent": geo.UA})
+                with urllib.request.urlopen(req, timeout=40) as r:
+                    data = r.read()
+                with open(path, "wb") as f:
+                    f.write(data)
+            _tiles[key] = np.asarray(Image.open(path).convert("L")).astype(np.float32)
+        except Exception:
+            _tiles[key] = None
+    t = _tiles[key]
+    if t is None:
+        return None
+    return float(t[min(255, int((fy - ty) * 256)), min(255, int((fx - tx) * 256))])
+
+
+def measured_width(line):
+    """Width of a pier read off the photo: the bright band across it, at its narrowest
+    typical point so that boats tied alongside do not count."""
+    widths = []
+    for i in range(len(line) - 1):
+        (ax, ay), (bx, by) = line[i], line[i + 1]
+        seg = math.hypot(bx - ax, by - ay)
+        if seg < 12:
+            continue
+        ux, uy = (bx - ax) / seg, (by - ay) / seg
+        for k in range(max(1, int(seg // 14))):
+            t = (k + 0.5) / max(1, int(seg // 14))
+            cx, cy = ax + (bx - ax) * t, ay + (by - ay) * t
+            prof = [photo_luma(cx - uy * o, cy + ux * o) for o in range(-16, 17)]
+            if any(v is None for v in prof):
+                return None
+            prof = np.array(prof)
+            water = np.median(np.concatenate([prof[:5], prof[-5:]]))
+            core = prof[14:19].max()
+            if core - water < 18:
+                continue                                     # no clear deck here (shadow, or the line is off)
+            half = water + (core - water) * 0.5
+            c = 14 + int(np.argmax(prof[14:19]))
+            lo = hi = c
+            while lo > 0 and prof[lo - 1] > half:
+                lo -= 1
+            while hi < len(prof) - 1 and prof[hi + 1] > half:
+                hi += 1
+            widths.append(hi - lo + 1)
+    if len(widths) < 3:
+        return None
+    return float(np.percentile(widths, 30))
+
+
+def build_piers():
+    """Piers and docks as centre lines with a width, so moored boats can be kept off them.
+
+    OpenStreetMap draws most piers as a single line. For piers longer than 60 m the
+    width is measured on the aerial photo. Shorter ones get a typical width. Piers
+    drawn as outlines are reduced to their long axis.
+    """
+    out = []
+    measured = 0
+    for e in OSM:
+        t = e.get("tags", {})
+        if e["type"] != "way" or t.get("man_made") != "pier" or not e.get("geometry"):
+            continue
+        pts = way_pts(e)
+        if len(pts) < 2:
+            continue
+        closed = len(pts) >= 4 and pts[0] == pts[-1]
+        if closed:
+            arr = np.array(pts[:-1], dtype=float)
+            c = arr.mean(axis=0)
+            _, _, vt = np.linalg.svd(arr - c)
+            major, minor = vt[0], vt[1]
+            a = (arr - c) @ major
+            b = (arr - c) @ minor
+            length, width = a.max() - a.min(), b.max() - b.min()
+            mid = c + major * (a.max() + a.min()) / 2 + minor * (b.max() + b.min()) / 2
+            if length > 2 and abs(area(pts)) / max(1e-6, length * width) > 0.55:
+                p0, p1 = mid - major * length / 2, mid + major * length / 2
+                out.append({"p": [round(float(v), 1) for v in (*p0, *p1)], "w": round(float(max(width, 1.5)), 1)})
+                continue
+            line, width = simplify(pts, 0.6), 1.2
+        else:
+            line = simplify(pts, 0.6)
+            total = sum(math.hypot(line[i + 1][0] - line[i][0], line[i + 1][1] - line[i][1]) for i in range(len(line) - 1))
+            width = 5.0 if total >= 150 else 3.2 if total >= 40 else 2.4
+            if total >= 60:
+                m = measured_width(line)
+                if m is not None:
+                    # the photo is 2 m per pixel, which fattens a narrow deck by about a pixel
+                    width = round(min(16.0, max(2.4, m - 1.4)), 1)
+                    measured += 1
+        out.append({"p": [v for q in line for v in q], "w": width})
+    print("piers", len(out), "with", sum(len(x["p"]) // 2 for x in out), "points;", measured, "widths measured on the photo")
+    return out
+
+
 # Names set the way a nautical chart sets them: water in italics, land upright.
 LABELS = [
     # text, lat, lon, kind, min zoom tier (0 = always)
@@ -380,6 +491,7 @@ def main():
         "terminals": terminals,
         "cranes": build_cranes(terminals),
         "aids": build_aids(),
+        "piers": build_piers(),
         "labels": [{"text": t, "at": W(la, lo), "kind": k, "tier": tier} for t, la, lo, k, tier in LABELS],
     }
     path = os.path.join(OUT, "harbor.json")

@@ -618,6 +618,242 @@ export function plainShip(L, B, rand) {
   return { geometry: b.build(), height: D + 18, lights, work: [] };
 }
 
+// ------------------------------------------------------------------ small craft
+
+/** Sailing yacht: slim hull, cabin trunk, cockpit, mast and a boom with the sail furled on it. */
+export function sailboat(L, B, rand) {
+  const b = new Builder();
+  const D = clamp(B * 0.26, 0.5, 1.7);
+  const outline = hullOutline(L, B, { bow: 0.58, bowA: 1.5, bowB: 0.95, stern: 0.2, transom: 0.55, bowTip: 0.03 });
+  const hullCol = pick(rand, [WHITE, WHITE, WHITE, 0x1c2f55, 0x1f4a3a, 0x8a1f1f, 0xdcd6c2]);
+  b.prism(outline, -0.6, D, hullCol, 0xe9e7df);
+  const cover = pick(rand, [0x1f4f8f, 0x1f4f8f, 0xcfc7b0, 0x7a1f1f, 0x2f6b4a, 0x23272b]);
+  // cabin trunk, companionway hatch and windows
+  const cx = L * 0.1, cl = L * 0.3, cw = B * 0.5;
+  b.on(cx, 0, D, cl, 0.5, cw, WHITE, { top: 0xf4f3ee });
+  for (const s of [-1, 1]) b.on(cx, s * (cw / 2 + 0.02), D + 0.15, cl * 0.7, 0.22, 0.04, WINDOW, { glow: 0.5 });
+  b.on(cx - cl * 0.5 + 0.3, 0, D + 0.5, 0.7, 0.08, cw * 0.4, 0x8d7a5f);
+  // cockpit with teak sole and a wheel
+  b.on(-L * 0.24, 0, D, L * 0.24, 0.06, B * 0.46, 0xa98a5e);
+  b.cyl(-L * 0.3, 0, D + 0.06, D + 0.9, 0.09, STEEL, { seg: 6 });
+  b.on(-L * 0.3, 0, D + 0.85, 0.08, 0.5, 0.75, STEEL);
+  // mast, boom and furled mainsail under its cover
+  const mx = L * 0.14, mastH = L * 1.15;
+  b.cyl(mx, 0, D + 0.5, D + mastH, 0.085 + L * 0.004, 0xc9cdd0, { seg: 6 });
+  b.on(mx - L * 0.19, 0, D + 1.7, L * 0.38, 0.14, 0.14, 0xc9cdd0);
+  b.on(mx - L * 0.19, 0, D + 1.84, L * 0.36, 0.34, 0.36, cover);
+  if (L > 17) {
+    // ketch: a second, shorter mast aft
+    b.cyl(-L * 0.34, 0, D, D + mastH * 0.62, 0.07 + L * 0.003, 0xc9cdd0, { seg: 6 });
+    b.on(-L * 0.42, 0, D + 1.6, L * 0.16, 0.3, 0.3, cover);
+  }
+  // furled headsail on the forestay, bow pulpit, stern rail
+  b.on(mx + (L * 0.5 - mx) * 0.5, 0, D + 0.6, (L * 0.5 - mx) * 0.9, 0.2, 0.2, 0xf1f1ec, { pitch: -0.5 });
+  b.on(L * 0.47, 0, D, 0.5, 0.45, B * 0.12, STEEL);
+  b.on(-L * 0.49, 0, D, 0.12, 0.5, B * 0.5, STEEL);
+  const lights = {
+    masthead: [mx, D + mastH, 0], masthead2: null,
+    port: [L * 0.44, D + 0.5, -B * 0.1], stbd: [L * 0.44, D + 0.5, B * 0.1], stern: [-L * 0.49, D + 0.6, 0],
+  };
+  return { geometry: b.build(), height: D + mastH, lights, work: [] };
+}
+
+/** Open motor boat: centre console with a T-top, bench seats, outboards. */
+export function runabout(L, B, rand) {
+  const b = new Builder();
+  const D = clamp(B * 0.24, 0.45, 0.9);
+  const outline = hullOutline(L, B, { bow: 0.42, bowA: 1.7, bowB: 0.8, stern: 0.05, transom: 0.95 });
+  const hullCol = pick(rand, [WHITE, WHITE, 0x9fc4d6, 0x1c2f55, 0xdcd6c2, 0x6f8fa3]);
+  b.prism(outline, -0.4, D, hullCol, 0xe4e3dc);
+  const sole = sliceOutline(outline, -L * 0.46, L * 0.3).map((p) => [p[0], Math.sign(p[1]) * Math.max(0, Math.abs(p[1]) - 0.28)]);
+  b.prism(sole, D - 0.25, D - 0.18, 0xbfc3bd, 0xc9cdc6);
+  b.on(L * 0.02, 0, D - 0.18, L * 0.14, 1.0, B * 0.34, WHITE, { top: 0xdedfd9 });                 // console
+  b.on(L * 0.02, 0, D + 1.75, L * 0.3, 0.08, B * 0.62, pick(rand, [WHITE, 0x1f4f8f, 0x23272b, 0xcfc7b0]));   // T-top
+  for (const s of [-1, 1]) for (const f of [-0.11, 0.15]) b.cyl(L * (0.02 + f), s * B * 0.24, D - 0.18, D + 1.75, 0.04, STEEL, { seg: 5 });
+  b.on(-L * 0.12, 0, D - 0.18, L * 0.07, 0.55, B * 0.5, 0xd8d2bf);                               // leaning post
+  b.on(L * 0.3, 0, D - 0.18, L * 0.12, 0.3, B * 0.42, 0xd8d2bf);                                 // bow cushion
+  const engines = L > 8 ? 2 : 1;
+  for (let i = 0; i < engines; i++) b.on(-L * 0.5 - 0.3, (i - (engines - 1) / 2) * 0.75, D - 0.2, 0.7, 0.75, 0.5, 0x1c1d20);
+  const lights = {
+    masthead: [L * 0.02, D + 2.1, 0], masthead2: null,
+    port: [L * 0.4, D + 0.2, -B * 0.16], stbd: [L * 0.4, D + 0.2, B * 0.16], stern: [-L * 0.48, D + 0.4, 0],
+  };
+  return { geometry: b.build(), height: D + 2.2, lights, work: [] };
+}
+
+/** Motor yacht or cabin cruiser. Grows a flybridge and then extra decks with length. */
+export function motorYacht(L, B, rand) {
+  if (L < 9.5) return runabout(L, B, rand);
+  const b = new Builder();
+  const big = L >= 24;
+  const D = clamp(B * 0.3, 0.9, 3.4);
+  const outline = hullOutline(L, B, { bow: 0.4, bowA: 1.6, bowB: 0.85, stern: 0.05, transom: 0.94 });
+  const hullCol = pick(rand, [WHITE, WHITE, WHITE, 0x1b2a4c, 0x23272b, 0xd9d6cb]);
+  const teak = 0xb08d5f;
+  b.prism(outline, -0.6, D, hullCol, 0xf0efe9);
+  // swim platform and aft cockpit in teak
+  b.on(-L * 0.5 - L * 0.025, 0, 0.25, L * 0.06, 0.12, B * 0.82, teak);
+  b.on(-L * 0.36, 0, D, L * 0.22, 0.06, B * 0.8, teak);
+  // main cabin with a dark windscreen band
+  const x0 = -L * 0.26, x1 = L * 0.2;
+  const cabin = sliceOutline(outline, x0, x1).map((p) => [p[0], Math.sign(p[1]) * Math.min(Math.abs(p[1]), B / 2 - 0.45)]);
+  const ch = big ? 2.6 : 1.9;
+  b.prism(cabin, D, D + ch, WHITE, 0xf4f3ee);
+  b.on(x1 + 0.02, 0, D + ch * 0.45, 0.08, ch * 0.42, B * 0.55, WINDOW, { glow: 0.5 });
+  b.on(x1 - L * 0.035, 0, D + ch, L * 0.06, 0.05, B * 0.5, WINDOW, { glow: 0.4 });               // raked windscreen, seen from above
+  for (const s of [-1, 1]) b.on((x0 + x1) / 2, s * (B / 2 - 0.43), D + ch * 0.45, (x1 - x0) * 0.82, ch * 0.38, 0.05, WINDOW, { glow: 0.55 });
+  let top = D + ch;
+  if (L >= 13) {
+    // flybridge with a hardtop or bimini
+    const fx0 = x0 + (x1 - x0) * 0.1, fx1 = x1 - (x1 - x0) * 0.25;
+    b.on((fx0 + fx1) / 2, 0, top, fx1 - fx0, 0.9, B * 0.62, WHITE, { top: 0xe6e3d8 });
+    b.on((fx0 + fx1) / 2 + (fx1 - fx0) * 0.12, 0, top + 2.0, (fx1 - fx0) * 0.6, 0.09, B * 0.58, pick(rand, [WHITE, 0x1f4f8f, 0xcfc7b0, 0x23272b]));
+    for (const s of [-1, 1]) b.cyl((fx0 + fx1) / 2, s * B * 0.26, top, top + 2.0, 0.05, STEEL, { seg: 5 });
+    top += 0.9;
+    if (big) {
+      // superyacht: sun deck with a hot tub, radar arch and domes, tender on the aft deck
+      b.on(fx0 + (fx1 - fx0) * 0.3, 0, top, (fx1 - fx0) * 0.5, 1.9, B * 0.5, WHITE, { top: 0xf4f3ee });
+      b.cyl(fx0 + (fx1 - fx0) * 0.8, 0, top, top + 0.45, Math.min(1.3, B * 0.12), 0xe9e7e0, { top: 0x55c6de, topGlow: 0.8, seg: 10 });
+      for (const s of [-1, 1]) b.cyl(fx0 + (fx1 - fx0) * 0.3, s * B * 0.12, top + 1.9, top + 2.8, 0.5, WHITE, { seg: 8 });
+      b.on(-L * 0.34, B * 0.12, D + 0.06, Math.min(5.5, L * 0.15), 0.7, 1.9, 0x6b7074, { top: ORANGE });
+      top += 1.9;
+    }
+  }
+  b.on(L * 0.3, 0, D, L * 0.1, 0.08, B * 0.3, 0xd8d2bf);                                          // foredeck sun pad
+  b.on(L * 0.44, 0, D, 0.7, 0.3, 0.5, STEEL);                                                    // windlass
+  const lights = {
+    masthead: [(x0 + x1) / 2, top + 1.2, 0], masthead2: null,
+    port: [x1, D + ch, -B * 0.3], stbd: [x1, D + ch, B * 0.3], stern: [-L * 0.5, D + 0.5, 0],
+  };
+  return { geometry: b.build(), height: top + 2.4, lights, work: [[-L * 0.3, D + 1.5, 0, B * 0.5]], festive: big };
+}
+
+/** Commercial fishing boat, drawn as a Lowcountry shrimp trawler with its outriggers. */
+export function fishingBoat(L, B, rand) {
+  if (L < 9) return runabout(L, B, rand);
+  const b = new Builder();
+  const D = clamp(B * 0.26, 0.9, 2.4);
+  const outline = hullOutline(L, B, { bow: 0.34, bowA: 1.8, bowB: 0.75, stern: 0.12, transom: 0.8 });
+  const hullCol = pick(rand, [WHITE, WHITE, 0x1f4a3a, 0x1c2f55, 0x8a1f1f, 0x2a2d30]);
+  const trim = pick(rand, [0x1f6b3a, 0x8a1f1f, 0x1c2f55, 0x23272b]);
+  b.prism(outline, -0.7, D, hullCol, 0x8a8f8a);
+  b.prism(outline, D - 0.05, D + 0.35, trim, trim, { noTop: true });                             // bulwark cap
+  const hx = L * 0.2, hl = L * 0.22, hw = B * 0.52;
+  b.on(hx, 0, D, hl, 2.3, hw, WHITE, { top: OFFWHITE });                                          // wheelhouse forward
+  b.on(hx + hl / 2 + 0.02, 0, D + 1.2, 0.06, 0.8, hw * 0.85, WINDOW, { glow: 0.5 });
+  for (const s of [-1, 1]) b.on(hx, s * (hw / 2 + 0.02), D + 1.2, hl * 0.7, 0.75, 0.05, WINDOW, { glow: 0.5 });
+  // mast with the outriggers swung out, as they are carried when working or drying nets
+  const mx = hx - hl / 2 - 0.6;
+  b.cyl(mx, 0, D, D + L * 0.42, 0.14, 0x6b6f72, { seg: 6 });
+  for (const s of [-1, 1]) {
+    b.on(mx, s * L * 0.19, D + L * 0.2, 0.2, 0.2, L * 0.42, 0x6b6f72, { yaw: 0, pitch: 0 });
+    b.on(mx - 0.4, s * L * 0.36, D + L * 0.2 - 0.6, 0.9, 0.9, 0.9, 0x2f6b4a);                     // trawl door or net float
+  }
+  b.on(mx - L * 0.05, 0, D + L * 0.3, L * 0.3, 0.16, 0.16, 0x6b6f72, { pitch: 0.35 });            // boom aft
+  // work deck: winch, hold hatch, piled net
+  b.on(-L * 0.08, 0, D, 1.6, 1.0, B * 0.36, 0x35393c);
+  b.on(-L * 0.24, 0, D, L * 0.12, 0.3, B * 0.34, 0x9aa0a4);
+  b.on(-L * 0.4, 0, D, L * 0.12, 0.7, B * 0.5, pick(rand, [0x2f6b4a, 0xb9662a, 0x2a5a6b]));
+  const lights = {
+    masthead: [mx, D + L * 0.42, 0], masthead2: null,
+    port: [hx, D + 2.4, -hw / 2], stbd: [hx, D + 2.4, hw / 2], stern: [-L * 0.5 + 0.3, D + 0.8, 0],
+  };
+  return { geometry: b.build(), height: D + L * 0.45, lights, work: [[-L * 0.25, D + 3, 0, B * 0.8]] };
+}
+
+/** Patrol craft: navy grey, police blue, or Coast Guard with an orange collar or stripe. */
+export function patrolBoat(L, B, rand, info = {}) {
+  const b = new Builder();
+  const kind = info.service || 'navy';
+  const D = clamp(B * 0.28, 0.6, 3.2);
+  const outline = hullOutline(L, B, { bow: 0.42, bowA: 1.6, bowB: 0.85, stern: 0.05, transom: 0.93 });
+  const grey = 0x7b848a;
+  const hullCol = kind === 'navy' ? grey : kind === 'police' ? 0x16284a : L < 16 ? 0xb9bfc3 : WHITE;
+  b.prism(outline, -0.6, D, hullCol, kind === 'navy' ? 0x666d72 : 0x9aa0a4);
+  if (kind === 'sar' && L < 16) {
+    // response boat: bright orange foam collar all round
+    const collar = outline.map((p) => [p[0] * 1.03, p[1] * 1.16]);
+    b.prism(collar, D - 0.55, D + 0.2, ORANGE, ORANGE);
+    b.prism(outline.map((p) => [p[0] * 0.95, p[1] * 0.8]), D + 0.2, D + 0.26, 0x9aa0a4, 0x9aa0a4);
+  } else if (kind === 'sar') {
+    b.on(L * 0.27, 0, D, L * 0.035, 0.05, B * 0.9, 0xd3401f, { yaw: 0.5 });                       // racing stripe across the bow
+    b.on(L * 0.235, 0, D, L * 0.012, 0.05, B * 0.9, 0x1f3f77, { yaw: 0.5 });
+  }
+  const hx = L * 0.04, hl = L * 0.3, hw = B * 0.6;
+  const houseCol = kind === 'navy' ? 0x8d959b : kind === 'police' ? WHITE : L < 16 ? 0xc3c9cd : WHITE;
+  b.on(hx, 0, D, hl, kind === 'navy' && L > 30 ? 3.2 : 2.1, hw, houseCol, { top: kind === 'navy' ? 0x7a8187 : OFFWHITE });
+  const hh = kind === 'navy' && L > 30 ? 3.2 : 2.1;
+  b.on(hx + hl / 2 + 0.02, 0, D + hh * 0.55, 0.06, hh * 0.3, hw * 0.85, WINDOW, { glow: 0.4 });
+  for (const s of [-1, 1]) b.on(hx, s * (hw / 2 + 0.02), D + hh * 0.55, hl * 0.75, hh * 0.28, 0.05, WINDOW, { glow: 0.4 });
+  b.on(hx - hl * 0.15, 0, D + hh, 0.3, 2.6, 0.3, kind === 'navy' ? 0x8d959b : OFFWHITE);
+  b.on(hx - hl * 0.15, 0, D + hh + 2.0, 0.25, 0.2, hw * 0.7, kind === 'navy' ? 0x8d959b : OFFWHITE);
+  if (kind === 'police') b.on(hx + hl * 0.1, 0, D + hh, 0.5, 0.25, hw * 0.5, 0x2a5ea8, { glow: 1 });
+  if (kind === 'navy' && L > 20) {
+    b.cyl(L * 0.32, 0, D, D + 1.1, Math.min(1.2, B * 0.14), 0x6f777d, { seg: 8 });               // gun mount
+    b.on(L * 0.32 + 1.6, 0, D + 0.8, 2.6, 0.16, 0.16, 0x4b5257);
+  }
+  if (L >= 16) b.on(-L * 0.33, 0, D, Math.min(5, L * 0.16), 0.7, 1.9, 0x3a3d40, { top: ORANGE });  // boat on the aft deck
+  const engines = L < 16 ? 2 : 0;
+  for (let i = 0; i < engines; i++) b.on(-L * 0.5 - 0.3, (i - 0.5) * 0.9, D - 0.2, 0.7, 0.8, 0.55, 0x1c1d20);
+  const lights = {
+    masthead: [hx - hl * 0.15, D + hh + 2.7, 0], masthead2: null,
+    port: [hx + hl * 0.3, D + hh, -hw / 2], stbd: [hx + hl * 0.3, D + hh, hw / 2], stern: [-L * 0.5 + 0.3, D + 0.6, 0],
+  };
+  return { geometry: b.build(), height: D + hh + 3, lights, work: [] };
+}
+
+/** Plain workboat for vessels whose kind AIS does not narrow down. */
+export function workboat(L, B, rand) {
+  if (L < 9) return runabout(L, B, rand);
+  const b = new Builder();
+  const D = clamp(B * 0.25, 0.8, 2.6);
+  const outline = hullOutline(L, B, { bow: 0.32, bowA: 1.9, bowB: 0.7, stern: 0.08, transom: 0.9 });
+  const hullCol = pick(rand, [0x1b1c1f, 0x1a2d4f, 0x1f4a3a, 0x3a3d40, 0x6e1f1a]);
+  b.prism(outline, -0.6, D, hullCol, pick(rand, [0x6b7074, 0x70352c, 0x5a5f63]));
+  const rim = outline.map((p) => [p[0] * 1.008, p[1] * 1.03]);
+  b.prism(rim, D - 0.4, D + 0.2, 0x0f1011, 0x0f1011, { noTop: true });
+  const hx = L * 0.2, hl = L * 0.24, hw = B * 0.56;
+  b.on(hx, 0, D, hl, 2.3, hw, WHITE, { top: OFFWHITE });
+  b.on(hx + hl / 2 + 0.02, 0, D + 1.2, 0.06, 0.8, hw * 0.85, WINDOW, { glow: 0.5 });
+  for (const s of [-1, 1]) b.on(hx, s * (hw / 2 + 0.02), D + 1.2, hl * 0.7, 0.75, 0.05, WINDOW, { glow: 0.5 });
+  b.on(hx - hl * 0.2, 0, D + 2.3, 0.25, 2.4, 0.25, OFFWHITE);
+  // open working deck aft: small crane, bitts, a stowed load
+  b.cyl(-L * 0.12, B * 0.2, D, D + 2.2, 0.3, 0xd8b93a, { seg: 6 });
+  b.on(-L * 0.25, B * 0.2, D + 2.1, L * 0.26, 0.25, 0.25, 0xd8b93a, { pitch: -0.12 });
+  b.on(-L * 0.3, -B * 0.12, D, L * 0.12, 0.8, B * 0.3, pick(rand, [0x8b9096, 0x2e6b4a, 0x224c7c]));
+  b.on(-L * 0.45, 0, D, 0.4, 0.7, B * 0.3, 0x2b2e31);
+  const lights = {
+    masthead: [hx - hl * 0.2, D + 4.8, 0], masthead2: null,
+    port: [hx, D + 2.4, -hw / 2], stbd: [hx, D + 2.4, hw / 2], stern: [-L * 0.5 + 0.3, D + 0.8, 0],
+  };
+  return { geometry: b.build(), height: D + 5, lights, work: [[-L * 0.25, D + 3, 0, B * 0.7]] };
+}
+
+/** Dredge: a square barge with a crane, spuds and a pump house. */
+export function dredge(L, B, rand) {
+  const b = new Builder();
+  const D = clamp(B * 0.14, 1.2, 3);
+  const o = [[-L / 2, B / 2], [L / 2 - B * 0.12, B / 2], [L / 2, B / 2 - B * 0.12], [L / 2, -B / 2 + B * 0.12], [L / 2 - B * 0.12, -B / 2], [-L / 2, -B / 2]];
+  b.prism(o, -0.8, D, 0x26292c, pick(rand, [0x70352c, 0x5d6468, 0x6b5a45]));
+  b.on(-L * 0.18, 0, D, L * 0.24, 4.2, B * 0.5, 0xd9d6cb, { top: 0xbfc4c8 });                    // pump and engine house
+  b.on(-L * 0.05, B * 0.2, D + 4.2, L * 0.07, 2.4, B * 0.2, WHITE, { top: OFFWHITE });            // control cab
+  b.on(-L * 0.05 + L * 0.036, B * 0.2, D + 5.2, 0.06, 0.9, B * 0.17, WINDOW, { glow: 0.5 });
+  // crane with its boom reaching over the bow
+  b.cyl(L * 0.16, 0, D, D + 3, Math.min(2.6, B * 0.16), 0xd8b93a, { seg: 10 });
+  b.on(L * 0.16, 0, D + 3, Math.min(6, L * 0.12), 2.6, Math.min(4.5, B * 0.3), 0xd8b93a, { top: 0xc4a52f });
+  b.on(L * 0.16 + L * 0.2, 0, D + 9, L * 0.44, 0.9, 1.1, 0xd8b93a, { pitch: 0.28 });
+  // spuds: the legs that pin the dredge to the bottom
+  for (const s of [-1, 1]) b.cyl(-L * 0.46, s * B * 0.38, D - 0.5, D + Math.max(12, L * 0.3), 0.55, 0x4b5257, { seg: 8 });
+  // discharge pipe along one side
+  b.on(-L * 0.05, -B * 0.42, D + 0.4, L * 0.8, 0.8, 0.8, 0x55595c);
+  for (let i = 0; i < 4; i++) b.on(L * (0.02 + i * 0.09), B * 0.36, D, 2.2, 1.4, 2.2, 0x35393c);
+  const lights = {
+    masthead: [-L * 0.05, D + 7.2, B * 0.2], masthead2: null,
+    port: [L * 0.45, D + 1.5, -B * 0.45], stbd: [L * 0.45, D + 1.5, B * 0.45], stern: [-L * 0.49, D + 1.5, 0],
+  };
+  return { geometry: b.build(), height: D + Math.max(13, L * 0.3), lights, work: [[L * 0.1, D + 8, 0, B * 0.7], [-L * 0.2, D + 6, 0, B * 0.6]] };
+}
+
 export const MODELS = {
   container: { build: containerShip, label: 'container ship' },
   tanker: { build: tanker, label: 'tanker' },
@@ -631,4 +867,22 @@ export const MODELS = {
   pilot: { build: pilotBoat, label: 'pilot boat' },
   atb: { build: tugBarge, label: 'tug and barge unit' },
   plain: { build: plainShip, label: 'large vessel' },
+  sail: { build: sailboat, label: 'sailing yacht' },
+  yacht: { build: motorYacht, label: 'motor yacht' },
+  runabout: { build: runabout, label: 'small motor boat' },
+  fishing: { build: fishingBoat, label: 'fishing boat' },
+  navy: { build: (L, B, r, i) => patrolBoat(L, B, r, { ...i, service: 'navy' }), label: 'military vessel' },
+  police: { build: (L, B, r, i) => patrolBoat(L, B, r, { ...i, service: 'police' }), label: 'law enforcement boat' },
+  rescue: { build: (L, B, r, i) => patrolBoat(L, B, r, { ...i, service: 'sar' }), label: 'rescue boat' },
+  workboat: { build: workboat, label: 'workboat' },
+  dredge: { build: dredge, label: 'dredge' },
+};
+
+// Used only when a vessel reports no usable hull size: a common size for its kind,
+// so it can still be drawn. The card says when a size is a stand-in.
+export const TYPICAL_SIZE = {
+  container: [180, 28], tanker: [120, 19], carcarrier: [190, 32], bulk: [170, 27], cargo: [85, 14], roro: [160, 25],
+  cruise: [70, 14], tourboat: [24, 7], tug: [27, 9], pilot: [16, 5], atb: [170, 22], plain: [45, 9],
+  sail: [11.5, 3.6], yacht: [12.5, 4], runabout: [7, 2.5], fishing: [20, 6.2], navy: [26, 6], police: [10, 3.2],
+  rescue: [13.7, 4.4], workboat: [15, 5], dredge: [60, 16],
 };

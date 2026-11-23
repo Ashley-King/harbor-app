@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { toWorld, KNOT } from '../geo.js';
 import { clamp, lerp, lerpAngle, angleDiff, smoothstep, rng, D2R } from '../util.js';
-import { MODELS } from '../ships/models.js';
+import { MODELS, TYPICAL_SIZE } from '../ships/models.js';
 import { chooseModel, findBerth, nearestPlace } from '../classify.js';
+import { PierIndex } from './piers.js';
 import { RED, GREEN, WHITE } from './lights.js';
 
 const WAKE_SECONDS = 150;
@@ -86,20 +87,6 @@ void main() {
   #include <colorspace_fragment>
 }`;
 
-function speckGeometry() {
-  // A small boat seen from above: pointed bow, square stern. Unit length along +X.
-  const s = new THREE.Shape();
-  s.moveTo(-0.5, -0.5);
-  s.lineTo(0.15, -0.5);
-  s.lineTo(0.5, 0);
-  s.lineTo(0.15, 0.5);
-  s.lineTo(-0.5, 0.5);
-  s.closePath();
-  const g = new THREE.ShapeGeometry(s);
-  g.rotateX(Math.PI / 2);
-  return g;
-}
-
 /**
  * Every vessel on the map: reconciles each data refresh with what is already
  * shown, moves ships along the track they really sailed, and owns their models,
@@ -122,14 +109,7 @@ export class Fleet {
     this.wakeMaterial = new THREE.ShaderMaterial({ vertexShader: WAKE_VERT, fragmentShader: WAKE_FRAG, uniforms: this.wakeUniforms, transparent: true, depthWrite: false, side: THREE.DoubleSide });
     this.kelvinGeometry = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
 
-    // Faded markers for small craft and for vessels with no usable dimensions.
-    this.speckMax = 600;
-    this.specks = new THREE.InstancedMesh(speckGeometry(), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.42, depthWrite: false, side: THREE.DoubleSide }), this.speckMax);
-    this.specks.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    this.specks.frustumCulled = false;
-    this.specks.renderOrder = 6;
-    this.specks.count = 0;
-    this.group.add(this.specks);
+    this.piers = new PierIndex(harbor.piers);
 
     // Ring around the selected vessel, and a tick at its newest reported position.
     const ring = new THREE.RingGeometry(0.96, 1.0, 96).rotateX(-Math.PI / 2);
@@ -140,12 +120,6 @@ export class Fleet {
     this.fix.visible = false;
     this.fix.renderOrder = 30;
     this.group.add(this.ring, this.fix);
-    this._m = new THREE.Matrix4();
-    this._q = new THREE.Quaternion();
-    this._v = new THREE.Vector3();
-    this._s = new THREE.Vector3();
-    this._up = new THREE.Vector3(0, 1, 0);
-    this._c = new THREE.Color();
   }
 
   // ------------------------------------------------------------ data
@@ -174,6 +148,10 @@ export class Fleet {
         e.assumedHeading = this._fitHeading(e.needsFit, e.v, e);
         e.needsFit = null;
       }
+    }
+    // With every heading settled, slide moored hulls clear of the wharf or dock they lie at.
+    for (const e of this.entities.values()) {
+      e.nudge = !e.gone && e.state !== 'underway' ? this._clearance(e) : null;
     }
   }
 
@@ -208,6 +186,9 @@ export class Fleet {
       last.t = Math.max(last.t, seenMs);
       if (reportHeading != null) last.hdg = reportHeading;
     } else {
+      // No track for this vessel: if the straight line from its last report to this one
+      // crosses land, it must not be drawn sailing over it. It is moved in one step instead.
+      if (last && !(v.track && v.track.length) && this._crossesLand(last, here)) pts[pts.length - 1].jump = true;
       for (const p of pts) {
         if (!last || p.t > last.t + 500) path.push(p);
       }
@@ -231,33 +212,100 @@ export class Fleet {
     while (path.length > 3 && path[1].t < e.s - WAKE_SECONDS * 1000 - 30000) path.shift();
     if (path.length > 400) path.splice(0, path.length - 400);
 
-    // Berth and model are decided from the newest report.
+    // Berth, model and size are decided from the newest report.
     const dims = v.length != null && v.beam != null;
     const off = this._centreOffset(v, reportHeading ?? 0);
     const cx = here.x + off.x, cy = here.y + off.y;
-    const still = v.sog == null || v.sog < 0.7;
+    // Tied-up boats still report a few tenths of a knot of GPS drift.
+    const tied = v.navStatus === 5 || v.navStatus === 1;
+    const still = v.sog == null || v.sog < (tied ? 1.6 : v.group === 'other' ? 1.0 : 0.7);
     e.berth = still ? findBerth(cx, cy, v.beam, this.harbor) : null;
     e.place = still && !e.berth ? nearestPlace(cx, cy, this.harbor) : null;
     e.state = !still ? 'underway' : e.berth ? 'berth' : v.navStatus === 1 ? 'anchor' : 'still';
-    if (reportHeading == null && e.lastHeading == null) {
-      // No heading from the ship: lie along the wharf, or failing that the way the hull fits the water.
-      if (e.berth) e.assumedHeading = e.berth.bearing;
-      else e.needsFit = still && dims && v.group !== 'other' ? here : null;
+    const choice = chooseModel(v, e.berth);
+    // Keep a model once chosen unless the reported size changes, so a ship does not
+    // change shape when it leaves the berth that hinted at its kind.
+    const sizeKey = dims ? `${v.length}:${v.beam}` : 'typical';
+    if (!e.model || e.sizeKey !== sizeKey || (e.model.how !== 'ais' && choice.how !== e.model.how && (choice.how === 'name' || choice.how === 'ais'))) {
+      const typical = TYPICAL_SIZE[choice.model];
+      e.size = dims ? { L: v.length, B: v.beam, estimated: false } : { L: typical[0], B: typical[1], estimated: true };
+      e.model = { ...choice, label: MODELS[choice.model].label, key: `${choice.model}:${e.size.L}:${e.size.B}` };
+      e.sizeKey = sizeKey;
     }
     if (reportHeading != null) e.lastHeading = reportHeading;
-    e.nudge = e.berth && dims ? this._clearWharf(cx, cy, reportHeading ?? e.lastHeading ?? e.assumedHeading ?? 0, v, e.berth) : null;
-    if (dims && v.group !== 'other') {
-      const choice = chooseModel(v, e.berth);
-      const key = `${choice.model}:${v.length}:${v.beam}`;
-      // Keep a model once chosen unless the reported size changes, so a ship does not
-      // change shape when it leaves the berth that hinted at its kind.
-      if (!e.model || e.sizeKey !== `${v.length}:${v.beam}` || (e.model.how !== 'ais' && choice.how === 'name' && e.model.model !== choice.model)) {
-        e.model = { ...choice, label: MODELS[choice.model].label, key };
-        e.sizeKey = `${v.length}:${v.beam}`;
-      }
-    } else {
-      e.model = null;
+    if (still && reportHeading == null && e.lastHeading == null) {
+      // No heading from the vessel: lie along the wharf or dock it is at, or failing
+      // that the way the hull fits the open water around it.
+      const pier = e.berth ? null : this._pierHeading(here, v, e.size);
+      if (e.berth) e.assumedHeading = e.berth.bearing;
+      else if (pier != null) e.assumedHeading = pier;
+      else e.needsFit = here;
+      e.headingFrom = e.berth ? 'wharf' : pier != null ? 'dock' : 'water';
     }
+  }
+
+  /** True when the straight line between two positions passes over land. */
+  _crossesLand(a, b) {
+    const wet = this.wetAt;
+    const d = Math.hypot(b.x - a.x, b.y - a.y);
+    if (!wet || d < 40) return false;
+    const steps = Math.min(400, Math.ceil(d / 12));
+    for (let i = 1; i < steps; i++) {
+      const f = i / steps;
+      if (wet(a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f) < 0.15) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Heading for a stationary vessel that reports none and sits at a pier or dock:
+   * along the dock. Which end is the bow is taken from its course over ground when
+   * it has one, and is otherwise a guess that the card owns up to.
+   */
+  _pierHeading(here, v, size) {
+    const hit = this.piers.nearest(here.x, here.y, size.B + 7);
+    if (!hit) return null;
+    const along = ((Math.atan2(hit.seg.ux, hit.seg.uy) / D2R) + 360) % 360;
+    const ref = v.cog;
+    if (ref != null && Math.abs(angleDiff(ref, along)) > 90) return (along + 180) % 360;
+    return along;
+  }
+
+  /**
+   * Where a moored hull has to move so it is not drawn through the wharf or dock it
+   * is tied to. GPS and antenna-offset errors of a few metres cause the overlap. The
+   * push is the shortest one that clears every pier nearby, and never more than 30 m.
+   */
+  _clearance(e) {
+    const v = e.v;
+    const here = e.path[e.path.length - 1];
+    const hd = here.hdg ?? e.lastHeading ?? e.assumedHeading ?? v.cog ?? 0;
+    const off = this._centreOffset(v, hd);
+    const h = hd * D2R;
+    const hull = { x: here.x + off.x, y: here.y + off.y, fx: Math.sin(h), fy: Math.cos(h), hl: e.size.L / 2, hb: e.size.B / 2 };
+    const x0 = hull.x, y0 = hull.y;
+    if (e.berth) {
+      const w = this._clearWharf(hull.x, hull.y, hd, e.size, e.berth);
+      if (w) {
+        hull.x += w.x;
+        hull.y += w.y;
+      }
+    }
+    for (let pass = 0; pass < 8; pass++) {
+      let worst = null;
+      for (const seg of this.piers.near(hull.x, hull.y, hull.hl + 12)) {
+        const push = PierIndex.push(hull, seg);
+        if (push && (!worst || push.depth > worst.depth)) worst = push;
+      }
+      if (!worst) break;
+      hull.x += worst.x;
+      hull.y += worst.y;
+    }
+    const nx = hull.x - x0, ny = hull.y - y0;
+    const d = Math.hypot(nx, ny);
+    if (d < 0.1) return null;
+    const k = d > 30 ? 30 / d : 1;
+    return { x: nx * k, y: ny * k };
   }
 
   /**
@@ -270,13 +318,14 @@ export class Fleet {
     const water = this.waterAt;
     const fallback = v.cog ?? 0;
     if (!water) return fallback;
+    const L = self.size.L, B = self.size.B;
     const score = (hd) => {
       const off = this._centreOffset(v, hd);
       const h = hd * D2R;
       let sum = 0;
       for (let i = -4; i <= 4; i++) {
         for (const side of [-0.4, 0.4]) {
-          const fx = (i / 8) * v.length, sx = side * v.beam;
+          const fx = (i / 8) * L, sx = side * B;
           sum += water(here.x + off.x + Math.sin(h) * fx + Math.cos(h) * sx, here.y + off.y + Math.cos(h) * fx - Math.sin(h) * sx);
         }
       }
@@ -312,14 +361,14 @@ export class Fleet {
    * "inside" the wharf. A ship cannot be there, so slide it straight off the wharf
    * face until it just clears the fenders. Never more than 30 m.
    */
-  _clearWharf(cx, cy, headingDeg, v, berth) {
+  _clearWharf(cx, cy, headingDeg, size, berth) {
     const h = headingDeg * D2R;
     const fx = Math.sin(h), fy = Math.cos(h);
     const sx = Math.cos(h), sy = -Math.sin(h);
     let min = Infinity;
     for (const [a, b] of [[0.42, 0.5], [0.42, -0.5], [-0.5, 0.5], [-0.5, -0.5], [0, 0.5], [0, -0.5]]) {
-      const px = cx + fx * v.length * a + sx * v.beam * b;
-      const py = cy + fy * v.length * a + sy * v.beam * b;
+      const px = cx + fx * size.L * a + sx * size.B * b;
+      const py = cy + fy * size.L * a + sy * size.B * b;
       min = Math.min(min, (px - berth.a[0]) * berth.out[0] + (py - berth.a[1]) * berth.out[1]);
     }
     const push = clamp(2.5 - min, 0, 30);
@@ -345,6 +394,7 @@ export class Fleet {
     while (i < n - 2 && path[i + 1].t <= t) i++;
     e._i = i;
     const a = path[i], b = path[i + 1];
+    if (b.jump) return { x: a.x, y: a.y, hdg: a.hdg, speed: 0, i };       // wait here, then step to b
     const span = Math.max(1, b.t - a.t);
     const f = (t - a.t) / span;
     const dist = Math.hypot(b.x - a.x, b.y - a.y);
@@ -360,7 +410,8 @@ export class Fleet {
   _build(e) {
     const v = e.v;
     const info = { name: v.name, grey: false };
-    const built = MODELS[e.model.model].build(v.length, v.beam, rng(v.mmsi), info);
+    const L = e.size.L, B = e.size.B;
+    const built = MODELS[e.model.model].build(L, B, rng(v.mmsi), info);
     const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82, metalness: 0.04 });
     const glow = this.glow;
     const deck = e.deck;
@@ -379,7 +430,6 @@ export class Fleet {
     mesh.receiveShadow = true;
     const object = new THREE.Group();
     object.add(mesh);
-    const L = v.length, B = v.beam;
     const kelvin = new THREE.Mesh(this.kelvinGeometry, new THREE.ShaderMaterial({
       vertexShader: KELVIN_VERT, fragmentShader: KELVIN_FRAG, transparent: true, depthWrite: false,
       uniforms: { ...this.wakeUniforms, uLen: { value: L }, uBeam: { value: B }, uSpeed: { value: 0 }, uExtent: { value: new THREE.Vector3(-L * 3.1, L * 0.5, L * 2.6 + B) } },
@@ -437,8 +487,8 @@ export class Fleet {
     if (!e.wake) e.wake = this._wakeMesh();
     const g = e.wake.geometry;
     const pos = g.attributes.position.array, uv = g.attributes.aUv.array, al = g.attributes.aAlpha.array;
-    const beam = e.v.beam || 6;
-    const len = e.v.length || 20;
+    const beam = e.size.B;
+    const len = e.size.L;
     const span = WAKE_SECONDS * 1000 * clamp(0.45 + e.speed / 14, 0.45, 1);
     // Samples run from the ship's stern back in time along the recorded track.
     const off = this._centreOffset(e.v, e.heading);
@@ -494,7 +544,6 @@ export class Fleet {
     lights.uniforms.uStrength.value = night;
     const mpp = this.stage.mpp;
     const timeLeft = Math.max(8000, this.nextRefreshAt - nowMs);
-    let specks = 0;
     const view = this.stage.viewRect(600);
 
     for (const [mmsi, e] of this.entities) {
@@ -505,6 +554,16 @@ export class Fleet {
       e.rate += (want - e.rate) * Math.min(1, dt * 0.8);
       if (remaining > 0) e.s = Math.min(newest.t, e.s + dt * 1000 * e.rate);
       const p = this._sample(e, e.s);
+      const at = e.path[p.i];
+      if (at !== e._at) {
+        // Arrived at a report that could not be reached by water: step there, and fade back in.
+        if (at.jump && e._at) {
+          e.pos.x = p.x;
+          e.pos.y = p.y;
+          e.fade = 0;
+        }
+        e._at = at;
+      }
       const k = e.first ? 1 : 1 - Math.exp(-dt * 2.2);
       e.pos.x += (p.x - e.pos.x) * k;
       e.pos.y += (p.y - e.pos.y) * k;
@@ -525,8 +584,8 @@ export class Fleet {
         continue;
       }
       const off = this._centreOffset(e.v, e.heading);
-      // Ease the wharf correction in and out as the ship arrives or leaves.
-      e.nudgeMix = clamp((e.nudgeMix || 0) + (e.nudge && e.state === 'berth' && e.path[e.path.length - 1].t - e.s < 1500 ? dt : -dt) / 4, 0, 1);
+      // Ease the dock correction in and out as the vessel arrives or leaves.
+      e.nudgeMix = clamp((e.nudgeMix ?? 1) + (e.nudge && e.state !== 'underway' && remaining < 1500 ? dt : -dt) / 4, 0, 1);
       if (e.nudge) e.nudgeLast = e.nudge;
       const nd = e.nudgeLast && e.nudgeMix > 0 ? e.nudgeLast : null;
       const cx = e.pos.x + off.x + (nd ? nd.x * e.nudgeMix : 0), cy = e.pos.y + off.y + (nd ? nd.y * e.nudgeMix : 0);
@@ -535,64 +594,50 @@ export class Fleet {
       e.screen.x = sp.x;
       e.screen.y = sp.y;
       const inView = cx > view.west && cx < view.east && cy > view.south && cy < view.north;
+      e.hidden = e.group === 'other' && !this.showOthers;
 
-      if (e.model) {
-        if (!e.object || e.builtKey !== e.model.key) {
-          if (!inView && !e.object) continue;         // build models as they come into view
-          this._dispose(e);
-          this._build(e);
-        }
-        const o = e.object;
-        o.position.set(cx, 0, -cy);
-        o.rotation.y = Math.PI / 2 - e.heading * D2R;
-        o.visible = e.fade > 0.01;
-        const mat = e.mesh.material;
-        const dim = e.stale ? 0.58 : 1;
-        mat.color.setScalar(dim);
-        if (e.fade < 1) {
-          mat.transparent = true;
-          mat.opacity = e.fade;
-        } else if (mat.transparent) {
-          mat.transparent = false;
-          mat.opacity = 1;
-          mat.needsUpdate = true;
-        }
-        const strength = smoothstep(1.0, 6.5, e.speed) * e.fade;
-        e.kelvin.visible = strength > 0.02;
-        e.kelvin.material.uniforms.uSpeed.value = strength;
-        this._updateWake(e, strength * 0.9);
-        // Deck floodlights are on when a ship is working cargo or at anchor, off under way.
-        const working = e.state !== 'underway' ? 1 : 0.12;
-        e.deck.value += (night * working * (e.built.festive ? 0.34 : 0.2) * dim - e.deck.value) * Math.min(1, dt * 2);
-        if (night > 0.02 && inView) this._lightsFor(e, cx, cy, working * dim, mpp);
-      } else {
-        if (e.object) this._dispose(e);
+      if (e.hidden) {
+        if (e.object) e.object.visible = false;
         if (e.wake) e.wake.visible = false;
-        if (!this.showOthers && e.group === 'other') continue;
-        if (specks < this.speckMax && inView) {
-          // Small craft and unmeasured vessels: a faint boat-shaped mark at true size when known.
-          const L = Math.max(e.v.length || (e.group === 'other' ? 8 : 24), 3.2 * mpp);
-          const B = Math.max(e.v.beam || L * 0.3, 1.5 * mpp, L * 0.26);
-          this._q.setFromAxisAngle(this._up, Math.PI / 2 - e.heading * D2R);
-          this._m.compose(this._v.set(cx, 0.3, -cy), this._q, this._s.set(L, 1, B));
-          this.specks.setMatrixAt(specks, this._m);
-          const tone = (e.group === 'other' ? 0.8 : 1) * e.fade * (e.stale ? 0.6 : 1) * (1 - night * 0.45);
-          this.specks.setColorAt(specks, this._c.setRGB(tone, tone, tone * 1.04));
-          specks++;
-          if (night > 0.02) lights.add(cx, cy, 2.5, WHITE, 0.55 * e.fade * (e.stale ? 0.5 : 1), 2.2);
-        }
+        continue;
       }
+      if (!e.object || e.builtKey !== e.model.key) {
+        if (!inView && !e.object) continue;           // build models as they come into view
+        this._dispose(e);
+        this._build(e);
+      }
+      const o = e.object;
+      o.position.set(cx, 0, -cy);
+      o.rotation.y = Math.PI / 2 - e.heading * D2R;
+      o.visible = e.fade > 0.01;
+      const mat = e.mesh.material;
+      const dim = e.stale ? 0.58 : 1;
+      mat.color.setScalar(dim);
+      if (e.fade < 1) {
+        mat.transparent = true;
+        mat.opacity = e.fade;
+      } else if (mat.transparent) {
+        mat.transparent = false;
+        mat.opacity = 1;
+        mat.needsUpdate = true;
+      }
+      const strength = smoothstep(1.0, 6.5, e.speed) * e.fade;
+      e.kelvin.visible = strength > 0.02;
+      e.kelvin.material.uniforms.uSpeed.value = strength;
+      this._updateWake(e, strength * 0.9);
+      // Deck floodlights are on when a ship is working cargo or at anchor, off under way.
+      // Small craft at a dock keep only a little cabin and cockpit light.
+      const working = e.state !== 'underway' ? 1 : 0.12;
+      const level = e.group === 'other' ? 0.1 : e.built.festive ? 0.34 : 0.2;
+      e.deck.value += (night * working * level * dim - e.deck.value) * Math.min(1, dt * 2);
+      if (night > 0.02 && inView) this._lightsFor(e, cx, cy, working * dim);
     }
-    this.specks.count = specks;
-    this.specks.instanceMatrix.needsUpdate = true;
-    if (this.specks.instanceColor) this.specks.instanceColor.needsUpdate = true;
-    this.specks.material.opacity = 0.36;
     lights.commit();
 
     // ---- selection ring
     const sel = this.selected != null ? this.entities.get(this.selected) : null;
-    if (sel && sel.centre) {
-      const r = Math.max((sel.v.length || 20) * 0.62, 16 * mpp) + 6 * mpp;
+    if (sel && sel.centre && !sel.hidden) {
+      const r = Math.max(sel.size.L * 0.62, 16 * mpp) + 6 * mpp;
       this.ring.visible = true;
       this.ring.position.set(sel.centre.x, 0.5, -sel.centre.y);
       this.ring.scale.set(r, 1, r);
@@ -613,55 +658,59 @@ export class Fleet {
     }
   }
 
-  /** Navigation and deck lights for one ship, placed on the model. */
-  _lightsFor(e, cx, cy, working, mpp) {
+  /** Navigation and deck lights for one vessel, placed on its model. */
+  _lightsFor(e, cx, cy, working) {
     const L = e.built.lights;
     const lights = this.lights;
     const h = e.heading * D2R;
     const sin = Math.sin(h), cos = Math.cos(h);
     const put = (p, color, intensity, size, sheen) => {
       if (!p) return;
-      // ship frame (x forward, z starboard) to world, with the lens parallax of its height
+      // ship frame (x forward, z starboard) to world
       const wx = cx + sin * p[0] + cos * p[2];
       const wy = cy + cos * p[0] - sin * p[2];
       lights.add(wx, wy, p[1] + 0.6, color, intensity * e.fade, size);
       if (sheen) lights.add(wx + cos * Math.sign(p[2] || 0) * sheen * 0.9, wy - sin * Math.sign(p[2] || 0) * sheen * 0.9, 0.4, color, intensity * 0.28 * e.fade, sheen);
     };
-    const big = (e.v.length || 0) > 50;
-    const s = clamp((e.v.beam || 10) * 0.16, 2.2, 5.5);
+    const len = e.size.L, beam = e.size.B;
+    const big = len > 50;
+    const s = clamp(beam * 0.16, 0.9, 5.5);
+    if (e.group === 'other' && e.state !== 'underway') {
+      // A small boat tied up or at anchor shows a single white light, as the rules ask at anchor.
+      put(L.masthead, WHITE, 1.3, s);
+      return;
+    }
     put(L.masthead, WHITE, 2.3, s);
     if (big) put(L.masthead2, WHITE, 2.3, s);
-    put(L.port, RED, 2.2, s * 0.9, big ? 13 : 6);
-    put(L.stbd, GREEN, 2.2, s * 0.9, big ? 13 : 6);
+    const sheen = big ? 13 : len > 20 ? 6 : 0;
+    put(L.port, RED, 2.2, s * 0.9, sheen);
+    put(L.stbd, GREEN, 2.2, s * 0.9, sheen);
     put(L.stern, WHITE, 1.7, s * 0.85, big ? 9 : 0);
-    if (working > 0.5) {
+    if (working > 0.5 && e.group !== 'other') {
       for (const w of e.built.work) put([w[0], w[1], w[2]], WARM_DECK, 0.26, Math.max(w[3] * 0.8, 6));
       // Loom of the deck lights on the water around the hull.
-      const len = e.v.length || 20;
       const n = Math.max(1, Math.round(len / 60));
-      for (let i = 0; i < n; i++) put([(-0.4 + (0.8 * (i + 0.5)) / n) * len, 0, 0], WARM_DECK, 0.16, (e.v.beam || 10) * 1.5);
+      for (let i = 0; i < n; i++) put([(-0.4 + (0.8 * (i + 0.5)) / n) * len, 0, 0], WARM_DECK, 0.16, beam * 1.5);
     }
   }
 
   // ------------------------------------------------------------ picking
 
-  /** The vessel under a screen point, large ships first. */
+  /** The vessel under a screen point. When hulls overlap, the one whose middle is nearest wins. */
   pick(px, py) {
     const w = this.stage.screenToWorld(px, py);
     const mpp = this.stage.mpp;
     let best = null;
     for (const e of this.entities.values()) {
-      if (!e.centre || e.gone) continue;
-      if (!e.model && e.group === 'other' && !this.showOthers) continue;
-      const len = e.model ? e.v.length : Math.max(e.v.length || 8, 3.2 * mpp);
-      const beam = e.model ? e.v.beam : Math.max(e.v.beam || 3, 1.5 * mpp);
+      if (!e.centre || e.gone || e.hidden) continue;
+      const len = e.size.L, beam = e.size.B;
       const h = e.heading * D2R;
       const dx = w.x - e.centre.x, dy = w.y - e.centre.y;
       const fwd = dx * Math.sin(h) + dy * Math.cos(h);
       const side = dx * Math.cos(h) - dy * Math.sin(h);
-      const pad = Math.max(9 * mpp, 4);
+      const pad = Math.max(9 * mpp, 2.5);
       if (Math.abs(fwd) <= len / 2 + pad && Math.abs(side) <= beam / 2 + pad) {
-        const score = Math.hypot(fwd / (len / 2 + pad), side / (beam / 2 + pad)) + (e.model ? 0 : 0.6);
+        const score = Math.hypot(fwd / (len / 2 + pad), side / (beam / 2 + pad));
         if (!best || score < best.score) best = { e, score };
       }
     }

@@ -16,7 +16,7 @@ const NOAA = 'https://api.tidesandcurrents.noaa.gov/api/prod/datagetter';
 const TIDE_STATION = '8665530';
 const AIRGAP_STATION = '8665353';
 const TRACK_MINUTES = 25;
-const MAX_TRACKS = 24;
+const MAX_TRACKS = 40;
 
 const lastGood = { ais: null, tide: null, airGap: null };
 
@@ -115,9 +115,11 @@ async function loadAis() {
   // Real track for vessels that are under way, so the page can move them along the
   // path they actually took instead of a straight line between two reports.
   const now = Date.now();
+  // Large ships first, then tugs and pilot boats, then the fastest small craft.
+  const rank = { ship: 0, tug: 1, pilot: 1, other: 2 };
   const moving = vessels
-    .filter((v) => v.group !== 'other' && v.sog != null && v.sog >= 0.4 && v.seen && now - Date.parse(v.seen) < 30 * 60000)
-    .sort((a, b) => (a.group === 'ship' ? 0 : 1) - (b.group === 'ship' ? 0 : 1) || b.sog - a.sog)
+    .filter((v) => v.sog != null && v.sog >= (v.group === 'other' ? 1.5 : 0.4) && v.seen && now - Date.parse(v.seen) < 30 * 60000)
+    .sort((a, b) => rank[a.group] - rank[b.group] || b.sog - a.sog)
     .slice(0, MAX_TRACKS);
   const fromIso = new Date(now - TRACK_MINUTES * 60000).toISOString().replace(/\.\d+Z$/, 'Z');
   let tracksFailed = 0;

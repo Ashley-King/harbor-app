@@ -88,19 +88,20 @@ export class Labels {
     // ---- ship names take the free spots next to their hulls
     const want = [];
     for (const e of fleet.entities.values()) {
-      if (e.gone || !e.centre) continue;
+      if (e.gone || !e.centre || e.hidden) continue;
       const isSel = e.mmsi === selected;
-      const len = e.v.length || 0;
+      const len = e.size ? e.size.L : 0;
       let ok = isSel;
       if (e.group === 'ship') ok = ok || len >= 150 || mpp < 11;
       else if (e.group === 'tug' || e.group === 'pilot') ok = ok || mpp < 3.2;
-      else ok = ok || mpp < 0.9;
+      else ok = ok || mpp < 1.4;
       if (!ok || !e.v.name) continue;
       want.push({ e, isSel, score: (isSel ? 1e6 : 0) + (e.group === 'ship' ? 1000 : 0) + len });
     }
     want.sort((a, b) => b.score - a.score);
     const live = new Set();
     for (const { e, isSel } of want) {
+      const len = e.size ? e.size.L : 20;
       const sx = e.screen.x, sy = e.screen.y;
       if (sx < -40 || sy < -20 || sx > W + 40 || sy > H + 20) continue;
       let s = this.ships.get(e.mmsi);
@@ -116,7 +117,7 @@ export class Labels {
         s.node.textContent = e.v.name;
         s.w = 0;
       }
-      const cls = `lbl k-ship${e.group !== 'ship' || (e.v.length || 0) < 150 ? ' is-small' : ''}${isSel ? ' is-selected' : ''}`;
+      const cls = `lbl k-ship${e.group !== 'ship' || len < 150 ? ' is-small' : ''}${isSel ? ' is-selected' : ''}`;
       if (s.node.className !== cls) {
         s.node.className = cls;
         s.w = 0;
@@ -128,7 +129,7 @@ export class Labels {
       }
       // Half the hull's footprint on screen decides how far out the name sits.
       const h = (e.heading * Math.PI) / 180;
-      const half = (e.v.length || 20) / 2 / mpp;
+      const half = len / 2 / mpp;
       const rx = Math.abs(Math.sin(h)) * half + 8, ry = Math.abs(Math.cos(h)) * half + 6;
       const spots = [[sx + rx, sy - s.h / 2], [sx - rx - s.w, sy - s.h / 2], [sx - s.w / 2, sy - ry - s.h], [sx - s.w / 2, sy + ry]];
       let placed = null;

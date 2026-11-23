@@ -5,7 +5,7 @@ The photos behind it are the 2021 USDA NAIP flight, which was shot at 0.6 m. Thi
 tool reads those same photos at full resolution from the public NAIP archive on
 Microsoft's Planetary Computer (public domain imagery, no key) and bakes zoom-17
 tiles at 512 px (0.5 m per pixel) for the places ships actually go: the terminals,
-the banks of the deep-draft channel and a few named spots.
+the banks of the deep-draft channel, the marinas and a few named spots.
 
 Each tile is colour-matched to the USGS tile it replaces, so the two blend without
 a seam. Open water is flattened, since the app redraws water anyway, which keeps
@@ -53,6 +53,7 @@ SAS = "https://planetarycomputer.microsoft.com/api/sas/v1/token/naip"
 USGS = "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}"
 CHANNEL_REACH_M = 450               # land within this distance of the channel
 TERMINAL_REACH_M = 200              # and this distance of a terminal
+MARINA_REACH_M = 380                # and this distance of the middle of a marina
 EXTRA = [                           # lat, lon, radius m
     (32.7905, -79.9085, 450),       # Patriots Point and the USS Yorktown
     (32.7523, -79.8747, 260),       # Fort Sumter
@@ -102,6 +103,19 @@ def choose_tiles():
     d = ImageDraw.Draw(spots)
     for lat, lon, r in EXTRA:
         u, v = to_px(*geo.to_world(lat, lon))
+        d.ellipse([u - r / MPP, v - r / MPP, u + r / MPP, v + r / MPP], fill=255)
+    # every marina, since that is where the small craft are
+    osm = json.load(open(os.path.join(CACHE, "osm_features.json")))["elements"]
+    for e in osm:
+        if e.get("tags", {}).get("leisure") != "marina":
+            continue
+        g = e.get("geometry") or [{"lat": e.get("lat"), "lon": e.get("lon")}]
+        if g[0]["lat"] is None:
+            continue
+        lat = sum(p["lat"] for p in g) / len(g)
+        lon = sum(p["lon"] for p in g) / len(g)
+        u, v = to_px(*geo.to_world(lat, lon))
+        r = MARINA_REACH_M
         d.ellipse([u - r / MPP, v - r / MPP, u + r / MPP, v + r / MPP], fill=255)
     near |= np.asarray(spots) > 0
     land = (mask[..., 0] < 250) | (mask[..., 1] > 20)

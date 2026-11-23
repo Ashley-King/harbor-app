@@ -63,6 +63,46 @@ export function buildCranes(scene, harbor, glowUniform) {
   return mesh;
 }
 
+/**
+ * Piers and docks, built from their OpenStreetMap lines as low slabs: concrete for
+ * the big commercial piers, weathered timber for the rest. The aerial photo is not
+ * used for them, because it also shows every boat that was tied up on the day it was
+ * flown.
+ */
+export function buildPiers(scene, harbor, glowUniform) {
+  const b = new Builder();
+  let k = 0;
+  for (const pier of harbor.piers || []) {
+    const c = pier.p;
+    const big = pier.w >= 8;
+    const h = big ? 2.4 : 1.1;
+    // deck colour varies a little from pier to pier
+    const tone = ((k++ * 37) % 17) / 17;
+    const col = big ? [0.5 + tone * 0.06, 0.5 + tone * 0.05, 0.47 + tone * 0.05] : [0.36 + tone * 0.08, 0.33 + tone * 0.07, 0.28 + tone * 0.06];
+    const side = big ? [0.3, 0.3, 0.29] : [0.2, 0.18, 0.15];
+    for (let i = 0; i + 3 < c.length; i += 2) {
+      const ax = c[i], ay = c[i + 1], bx = c[i + 2], by = c[i + 3];
+      const len = Math.hypot(bx - ax, by - ay);
+      if (len < 0.4) continue;
+      // each piece runs half a width past its ends so corners close up
+      b.box((ax + bx) / 2, h / 2 - 0.2, -(ay + by) / 2, len + pier.w * 0.9, h + 0.4, pier.w, side, { yaw: Math.atan2(by - ay, bx - ax), top: col, noBottom: true });
+    }
+  }
+  const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0 });
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uGlow = glowUniform;
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform float uGlow;')
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * uGlow * 0.3;');
+  };
+  const mesh = new THREE.Mesh(b.build(), material);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  mesh.frustumCulled = false;
+  scene.add(mesh);
+  return mesh;
+}
+
 const LINE_VERT = /* glsl */ `
 attribute vec2 aNormal;
 attribute float aSide;

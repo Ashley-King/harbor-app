@@ -1,24 +1,44 @@
 // Decides how each vessel is drawn and where it is berthed.
 //
-// AIS gives a broad type (cargo, tanker, passenger, tug, pilot) but not the kind of
-// cargo ship. Tankers, passenger vessels, tugs and pilot boats are drawn straight
-// from the AIS type. For cargo ships the model is an estimate from the name, the
-// berth and the size, and the ship card says so. The AIS type itself is always
-// shown exactly as reported.
+// AIS gives a broad type (cargo, tanker, passenger, tug, pilot, sailing, pleasure
+// craft, fishing and so on) but not the kind of cargo ship. Vessels whose AIS type
+// names their kind are drawn straight from it. For cargo ships the model is an
+// estimate from the name, the berth and the size, and the ship card says so. A
+// vessel with no usable type gets a plain workboat or small motor boat. The AIS type
+// itself is always shown exactly as reported.
 
 const CONTAINER_NAME = /^(MSC|CMA CGM|APL|ANL|MAERSK|SEALAND|EVER|COSCO|OOCL|CSCL|ONE|YM|ZIM|HMM|HYUNDAI|HAPAG|NYK|WAN HAI|SEASPAN|CONTI|GSL|KOTA|X-PRESS|CAP|SANTA|NORTHERN|AL)\b|\bMAERSK\b|\bEXPRESS$/;
 const CARRIER_NAME = /\b(LEADER|HIGHWAY|ACE)$|^(HOEGH|HÖEGH|GLOVIS|MORNING|GRANDE|RCC|ARC|ALLIANCE|GREEN|AUTO|TORINO|TOSCA|TITUS|TALISMAN|TONSBERG|THERMOPYLAE|THEBEN|TORRENS|TOLEDO|TAMESIS|TIJUCA|TIRRANNA|TOMBARRA|TORTUGAS|TYSLA|TARAGO|TAMERLANE|TRAVIATA|FIDELIO|FAUST|FIGARO|OBERON|OTELLO|PARSIFAL|SALOME|UNDINE|CARMEN|AIDA|ELEKTRA|MIGNON|TITANIA|TRISTAN|ENDURANCE|PATRIOT|LIBERTY|FREEDOM|RESOLVE|HONOR|INTEGRITY)\b/;
 const RESERVE_FLEET = /^CAPE [A-Z]+$/;
 
-/** { model, how } where how is 'ais', 'name', 'berth' or 'size'. */
+// Small craft: AIS types that say what the boat is.
+const BY_TYPE = {
+  30: 'fishing', 33: 'dredge', 34: 'workboat', 35: 'navy', 36: 'sail', 37: 'yacht',
+  51: 'rescue', 53: 'workboat', 54: 'workboat', 55: 'police', 58: 'workboat', 59: 'workboat',
+};
+// And name habits that give it away when the type is missing or just "other".
+const BY_NAME = [
+  [/^S\/?V\b|\bSAILING\b/, 'sail'],
+  [/^M\/?Y\b|\bYACHT\b/, 'yacht'],
+  [/^F\/?V\b|\bSHRIMP|\bTRAWL/, 'fishing'],
+  [/^CG ?\d|\bUSCGC?\b|COAST GUARD/, 'rescue'],
+  [/\bSHERIFF|\bPOLICE|\bSCDNR\b|\bMARINE PATROL/, 'police'],
+  [/\bDREDGE\b/, 'dredge'],
+  [/\bPILOT\b/, 'pilot'],
+  [/\bTUG\b|\bTOWING\b/, 'tug'],
+];
+
+/**
+ * { model, how } for every vessel. `how` says what the choice rests on:
+ * 'ais' (the reported type), 'name', 'berth' or 'size'.
+ */
 export function chooseModel(v, berth) {
   const L = v.length;
   const type = v.type || 0;
   const name = (v.name || '').toUpperCase();
-  if (v.group === 'pilot') return { model: 'pilot', how: 'ais' };
-  if (v.group === 'tug') return { model: 'tug', how: 'ais' };
-  if (type === 52 || type === 31 || type === 32) return { model: 'atb', how: 'size' };   // a tug longer than 150 m is a tug and barge unit
-  if (type >= 60 && type <= 69) return { model: L >= 55 ? 'cruise' : 'tourboat', how: 'ais' };
+  if (type === 50) return { model: 'pilot', how: 'ais' };
+  if (type === 52 || type === 31 || type === 32) return L != null && L > 150 ? { model: 'atb', how: 'size' } : { model: 'tug', how: 'ais' };   // a tug longer than 150 m is a tug and barge unit
+  if (type >= 60 && type <= 69) return { model: L != null && L >= 55 ? 'cruise' : 'tourboat', how: 'ais' };
   if (type >= 80 && type <= 89) return { model: 'tanker', how: 'ais' };
   if (type >= 70 && type <= 79) {
     if (RESERVE_FLEET.test(name) && v.flag === 'US') return { model: 'roro', how: 'name' };
@@ -26,11 +46,17 @@ export function chooseModel(v, berth) {
     if (CONTAINER_NAME.test(name)) return { model: 'container', how: 'name' };
     if (berth && ['wando', 'nct', 'leatherman'].includes(berth.terminal)) return { model: 'container', how: 'berth' };
     if (berth && berth.terminal === 'columbus' && L >= 160 && v.beam >= 28) return { model: 'carcarrier', how: 'berth' };
+    if (L == null) return { model: 'cargo', how: 'ais' };
     if (L >= 245) return { model: 'container', how: 'size' };
     if (L >= 150) return { model: 'bulk', how: 'size' };
     return { model: 'cargo', how: 'size' };
   }
-  return { model: 'plain', how: 'size' };
+  if (BY_TYPE[type]) return { model: BY_TYPE[type], how: 'ais' };
+  if (type >= 40 && type <= 49) return { model: L != null && L >= 40 ? 'plain' : 'yacht', how: 'ais' };   // high-speed craft: a fast ferry when large
+  for (const [re, model] of BY_NAME) if (re.test(name)) return { model, how: 'name' };
+  // Type missing or "other": a plain hull that claims nothing.
+  if (L != null && L > 60) return { model: 'plain', how: 'size' };
+  return { model: L != null && L < 9 ? 'runabout' : 'workboat', how: 'size' };
 }
 
 export const HOW_TEXT = {
@@ -39,6 +65,9 @@ export const HOW_TEXT = {
   berth: 'estimated from the berth',
   size: 'estimated from the size',
 };
+
+/** True when the model is a stand-in because AIS gave no type to go on. */
+export const isGuess = (v, choice) => choice.how === 'size' && !(v.type >= 60 && v.type <= 89) && choice.model !== 'atb';
 
 function segDistance(px, py, a, b) {
   const dx = b[0] - a[0], dy = b[1] - a[1];

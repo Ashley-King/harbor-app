@@ -1,6 +1,6 @@
 import { clockSmart, zoneName, ago, esc, countryName } from '../util.js';
 import { aisTypeName, NAV_STATUS } from '../../lib/vessels.js';
-import { HOW_TEXT } from '../classify.js';
+import { HOW_TEXT, isGuess } from '../classify.js';
 
 const unknown = '<span class="unknown">unknown</span>';
 const show = (v) => (v == null || v === '' ? unknown : esc(v));
@@ -45,18 +45,20 @@ export function renderCard(el, e, now = Date.now()) {
     : e.state === 'berth' ? `At ${e.berth.label}`
     : e.state === 'anchor' ? `At anchor${e.place ? ` near ${e.place}` : ''}`
     : `Stopped${e.place ? ` near ${e.place}` : ''}`;
-  const drawn = e.model
-    ? `${esc(e.model.label[0].toUpperCase() + e.model.label.slice(1))}${HOW_TEXT[e.model.how] ? `<small>${esc(HOW_TEXT[e.model.how])}; AIS does not say which kind of cargo ship</small>` : ''}`
-    : e.group === 'other' ? 'Faded mark<small>only large ships, tugs and pilot boats get a model</small>'
-    : 'Faded mark<small>no hull size reported, so no model can be scaled</small>';
+  const cargo = v.type >= 70 && v.type <= 79;
+  const why = isGuess(v, e.model) ? 'AIS gives no type to go on, so this is a plain stand-in'
+    : HOW_TEXT[e.model.how] ? `${HOW_TEXT[e.model.how]}${cargo ? '; AIS does not say which kind of cargo ship' : ''}`
+    : null;
+  const standIn = e.size.estimated ? `no hull size reported, so it is drawn at a typical ${e.size.L} m by ${e.size.B} m` : null;
+  const drawn = `${esc(e.model.label[0].toUpperCase() + e.model.label.slice(1))}${[why, standIn].filter(Boolean).map((t) => `<small>${esc(t)}</small>`).join('')}`;
   const ll = v.lat != null ? `${Math.abs(v.lat).toFixed(4)}° ${v.lat >= 0 ? 'N' : 'S'}, ${Math.abs(v.lon).toFixed(4)}° ${v.lon >= 0 ? 'E' : 'W'}` : null;
   const newest = e.path[e.path.length - 1];
   const lag = newest ? Math.hypot(newest.x - e.pos.x, newest.y - e.pos.y) : 0;
   const warns = [];
   if (e.stale) warns.push(`Not heard for ${ago(e.seenMs, now).replace(' ago', '')}. It may have left or switched its transponder off.`);
-  if (!e.headingKnown && e.model) warns.push(e.berth ? 'Heading not reported. Drawn lying along the wharf.' : e.state === 'underway' ? 'Heading not reported. Drawn on its course over ground.' : 'Heading not reported. Drawn the way the hull fits the water around it, so bow and stern may be swapped.');
+  if (!e.headingKnown) warns.push(e.state === 'underway' ? 'Heading not reported. Drawn on its course over ground.' : e.headingFrom === 'wharf' ? 'Heading not reported. Drawn lying along the wharf.' : e.headingFrom === 'dock' ? 'Heading not reported. Drawn lying along its dock, so bow and stern may be swapped.' : 'Heading not reported. Drawn the way the hull fits the water around it, so bow and stern may be swapped.');
   if (lag > 60) warns.push(`The model is following the ship's real track and is ${lag >= 1000 ? `${(lag / 1000).toFixed(1)} km` : `${Math.round(lag / 10) * 10} m`} short of this report. The ring marks the reported position.`);
-  const key = JSON.stringify([v.mmsi, v.seen, e.state, e.stale, e.headingKnown, Math.round(lag / 50), e.model && e.model.key, Math.floor((now - e.seenMs) / 60000)]);
+  const key = JSON.stringify([v.mmsi, v.seen, e.state, e.stale, e.headingKnown, e.headingFrom, Math.round(lag / 50), e.model.key, Math.floor((now - e.seenMs) / 60000)]);
   if (el.dataset.key === key) return;
   el.dataset.key = key;
   el.innerHTML = `

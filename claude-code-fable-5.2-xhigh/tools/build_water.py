@@ -4,8 +4,10 @@ The aerial photos contain whatever was afloat on the day they were flown: ships 
 the terminals, barges at anchor, boat wakes. The app must only ever show vessels
 from the live AIS feed, so the water is redrawn by a shader wherever this mask says
 "water", which removes everything that was photographed on it. Fixed structures
-(piers, bridges, jetties, the museum ships at Patriots Point) are flagged so the
-shader keeps their photographed pixels.
+(bridges, jetties, the museum ships at Patriots Point) are flagged so the shader
+keeps their photographed pixels. Piers and docks are left as water here: the app
+draws them itself from their map lines, which also clears away the boats that were
+photographed in the marinas.
 
 Inputs : tools/.cache/osm_water.json, osm_features.json (see fetch_osm.py)
          public/data/base.jpg (see fetch_imagery.py)
@@ -44,7 +46,11 @@ KEEP_LINES = [
 
 def main():
     water = R.water_polygons() | R.sea(SEEDS)
-    struct_img = Image.fromarray((R.structures() * 255).astype(np.uint8))
+    # Water runs under every structure, piers included.
+    water |= R.structures(piers=True) & ndimage.binary_dilation(water, iterations=6)
+    # Piers and docks are drawn by the app from their OpenStreetMap lines, so their
+    # photographed pixels (and every boat photographed alongside them) are not kept.
+    struct_img = Image.fromarray((R.structures(piers=False) * 255).astype(np.uint8))
     dr = ImageDraw.Draw(struct_img)
     for poly in KEEP_POLYGONS:
         dr.polygon([R.px(*p) for p in poly], fill=255)

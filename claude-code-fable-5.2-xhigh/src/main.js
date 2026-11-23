@@ -11,7 +11,7 @@ import { Stage } from './scene/stage.js';
 import { Env } from './scene/env.js';
 import { Ground } from './scene/ground.js';
 import { LightField, buildCityLights, renderLightMap } from './scene/lights.js';
-import { buildCranes, buildChannel } from './scene/structures.js';
+import { buildCranes, buildChannel, buildPiers } from './scene/structures.js';
 import { Fleet } from './scene/fleet.js';
 import { Feed } from './data.js';
 import { Panel } from './ui/panel.js';
@@ -32,23 +32,31 @@ async function loadJson(url) {
   return res.json();
 }
 
-/** Open-water coverage (0..1) at a world position, read from the mask on the CPU. */
-function waterSampler(image, b) {
-  const w = Math.round(image.width / 2), h = Math.round(image.height / 2);
+/**
+ * The water mask on the CPU, for placing vessels. Returns two lookups by world position:
+ * `wet` is water coverage (0..1) and `open` is the same with piers, bridges and jetties
+ * counted as obstacles.
+ */
+function waterSamplers(image, b) {
+  const w = image.width, h = image.height;
   const c = document.createElement('canvas');
   c.width = w;
   c.height = h;
   const ctx = c.getContext('2d', { willReadFrequently: true });
-  ctx.drawImage(image, 0, 0, w, h);
+  ctx.drawImage(image, 0, 0);
   const px = ctx.getImageData(0, 0, w, h).data;
-  // Open water only: piers, bridges and jetties (green channel) count as obstacles.
+  const wet = new Uint8Array(w * h);
   const open = new Uint8Array(w * h);
-  for (let i = 0; i < open.length; i++) open[i] = Math.round((px[i * 4] * (255 - px[i * 4 + 1])) / 255);
-  return (x, y) => {
+  for (let i = 0; i < wet.length; i++) {
+    wet[i] = px[i * 4];
+    open[i] = Math.round((px[i * 4] * (255 - px[i * 4 + 1])) / 255);
+  }
+  const lookup = (arr) => (x, y) => {
     const u = Math.floor(((x - b.west) / (b.east - b.west)) * w);
     const v = Math.floor(((b.north - y) / (b.north - b.south)) * h);
-    return u < 0 || v < 0 || u >= w || v >= h ? 0 : open[v * w + u] / 255;
+    return u < 0 || v < 0 || u >= w || v >= h ? 0 : arr[v * w + u] / 255;
   };
+  return { wet: lookup(wet), open: lookup(open) };
 }
 
 function savedMode() {
@@ -94,8 +102,11 @@ async function boot() {
   stage.scene.add(shipLights.mesh);
 
   const fleet = new Fleet(stage, env, harbor, shipLights, noise);
-  fleet.waterAt = waterSampler(mask.image, geo.base);
+  const water = waterSamplers(mask.image, geo.base);
+  fleet.waterAt = water.open;
+  fleet.wetAt = water.wet;
   buildCranes(stage.scene, harbor, fleet.glow);
+  buildPiers(stage.scene, harbor, fleet.glow);
   const channel = buildChannel(stage.scene, harbor, env.uniforms);
   const labels = new Labels($('labels'), stage, harbor);
 
